@@ -1,19 +1,25 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function VerifyEmailContent() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const token = searchParams.get('token');
 
     const [status, setStatus] = useState('loading');
+    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        if (!token) {
+        setIsClient(true);
+    }, []);
+
+    useEffect(() => {
+        if (!token || !isClient) {
             setStatus('waiting');
             return;
         }
@@ -41,7 +47,15 @@ function VerifyEmailContent() {
         };
 
         verify();
-    }, [token]);
+    }, [token, isClient]);
+
+    if (!isClient) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>
@@ -80,22 +94,8 @@ function VerifyEmailContent() {
     );
 }
 
-function VerifyEmailWrapper() {
-    return (
-        <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-        }>
-            <VerifyEmailContent />
-        </Suspense>
-    );
-}
-
-export const dynamic = 'force-dynamic';
-
 export default function VerifyEmailPage() {
-    return <VerifyEmailWrapper />;
+    return <VerifyEmailContent />;
 }
 
 const styles = {

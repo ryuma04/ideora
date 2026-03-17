@@ -25,8 +25,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-    // the path which user cannot visit directly
-    // Dashboard, verifyEmail, forgotPassword, resetPassword
-    matcher: ['/dashboard/:path*']
-    //covers everything inside profile like profile/user..etc
+    // Standard matcher for protected and auth routes
+    matcher: [
+        '/dashboard/:path*',
+        '/meeting/:path*',
+        '/auth/:path*',
+    ]
 }

@@ -1,7 +1,10 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function ResetPasswordForm() {
     const [newpassword, setnewpassword] = useState('');
@@ -9,9 +12,14 @@ function ResetPasswordForm() {
     const [buttondisabled, setbuttondisabled] = useState(false);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('');
+    const [isClient, setIsClient] = useState(false);
 
     const params = useSearchParams();
     const token = params.get('token');
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     useEffect(() => {
         if (newpassword.length > 0 && newpassword === confirmnewpassword) {
@@ -48,6 +56,14 @@ function ResetPasswordForm() {
             setMessage('Error in resetting password');
         }
     };
+
+    if (!isClient) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>
@@ -108,22 +124,8 @@ function ResetPasswordForm() {
     );
 }
 
-function ResetPasswordWrapper() {
-    return (
-        <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-        }>
-            <ResetPasswordForm />
-        </Suspense>
-    );
-}
-
-export const dynamic = 'force-dynamic';
-
 export default function ResetPasswordPage() {
-    return <ResetPasswordWrapper />;
+    return <ResetPasswordForm />;
 }
 
 const styles = {
