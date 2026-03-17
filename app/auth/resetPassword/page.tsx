@@ -1,10 +1,10 @@
 "use client"
 
 import { useSearchParams } from "next/navigation";
-import React from "react"
+import React, { Suspense } from "react"
 import { useState, useEffect } from "react"
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
     const [newpassword, setnewpassword] = useState("");
     const [confirmnewpassword, setconfirmnewpassword] = useState("");
     const [buttondisabled, setbuttondisabled] = useState(false);
@@ -109,6 +109,18 @@ export default function ResetPasswordPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        }>
+            <ResetPasswordForm />
+        </Suspense>
     );
 }
 
