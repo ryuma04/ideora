@@ -1,0 +1,137 @@
+External library installed:
+    1. axios: for working in prod
+    2. bcryptjs: for encryption
+    3. jsonwebtoken: for cookies and token
+    4. react-hot-toast: for displaying toast message
+    5. mongoose: for communicating with MongoDB
+    6. crypto: for encryption
+    7. livekit: for video conferencing
+    8. cloudinary: for profile picture
+    9. tldraw: for brainstorming canvas
+    10. redis: for temporary storage of the "Current Session State"
+    11. jspdf, html2canvas: for exporting the brainstorming canvas to pdf
+
+    {/* Logo */}
+                    <div className="text-center mb-8">
+                        <div className="w-12 h-12 bg-indigo-600 rounded-lg mx-auto mb-3 flex items-center justify-center">
+                            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                        </div>
+                        <h1 className="text-xl font-bold text-slate-900">Ideora</h1>
+                    </div>
+
+
+
+using livekit for meeting
+how it works:
+1. User logs into YOUR app
+2. Your backend generates a LiveKit access token
+3. Backend sends token to frontend
+4. Frontend connects to LiveKit using that token
+
+Backend creates token like:
+room = meetingId
+identity = userId
+
+permissions:
+canPublish
+canSubscribe
+canPublishData
+Then return token to frontend.
+
+Note:
+Room name should match your meetingId.
+That way your meeting logic and LiveKit room are synced.
+
+
+for guest user implementation:
+1. Added two extra fields in the participant collection - isGuest, expire
+2. The isGuest field is set to true for guest users, but false for normal users
+3. The userID will be null for guest users
+4. I have set the expire of the guest user 6 hours in the expire attribute of the participant collection
+5. I used TTL operation of mongo db, so that the guest will automatically be removed once it reaches the time specified at the expire attribute
+6. The normal user will have expire attribute as null
+
+
+
+brainstorming plan:
+
+Feature Blueprint: The Ideora Brainstorming Workspace
+1. Vision & Core Value
+Transform the meeting from a conversation into a "Productivity Session." The brainstorming module allows users to visualize ideas and immediately convert them into structured outcomes (Tasks/Docs) that persist after the call ends.
+
+2. User Experience (UX) Flow
+Entry: A "Brainstorming" icon 💡 on the meeting sidebar.
+Transition: Clicking the icon toggles the UI from "Video Grid" to "Workspace View."
+Persistence: Video feeds of participants remain visible in a small sidebar or top strip (PiP mode) so collaboration stays personal.
+Access Control: By default, it is Read-Only for guests. The Host must explicitly grant "Edit Permissions" via a toggle.
+3. The Three Brainstorming Modes
+Infinite Whiteboard (Freehand): A canvas for sketching architectural diagrams, UI mockups, or quick scribbles.
+Collaborative Sticky Notes: Virtual Post-its with domain-specific colors (e.g., Green for "Features," Red for "Risks"). Features a "Voting" system to prioritize ideas.
+Mind Mapping: Connectors that link notes or text boxes together to show the hierarchy of a project.
+4. Technical Architecture
+Frontend Library: Use tldraw or fabric.js to handle the heavy lifting of canvas rendering and shape management.
+Real-time Sync:
+LiveKit Data Channels: High-speed broadcasting of mouse movements, drawings, and note placements.
+Redis: Temporary storage of the "Current Session State." Ensures that when a new user joins or someone refreshes, the board isn't empty.
+Long-term Storage:
+MongoDB: Stores the final "Outcome" data tied to the meetingID.
+5. Outcome & Export System ("The Ideora Twist")
+At the end of the session, the Host triggers the Finalize action:
+
+Whiteboard: Captured as a .png/.jpg and saved to the Meeting History.
+Mindmap: Exported as a .pdf report.
+Sticky Notes: The most-voted notes are parsed into a Task List. These are saved as "Action Items" in the MongoDB Task collection and appear on the user's Dashboard.
+6. Phase-wise Implementation Strategy
+Phase 1: Layout & Sidebar integration (The "Shell").
+Phase 2: Integration of the Canvas library (The "Drawing").
+Phase 3: LiveKit/Redis Sync (The "Collaboration").
+Phase 4: Permissions & Role-based logic (The "Control").
+Phase 5: PDF/Image/Task export logic (The "Outcome").
+
+
+
+Brainstorming working:
+
+1. When a user starts writing in the brainstorming, the data is immediately route to livekit server
+2. The livekit server then broadcasts the data to all the users in the meeting
+3. At the same time, the data will also be stored in the redis, since livekit will forget after broadcasting the data
+4. Redis will store the whole state of the brainstorming and updates in few ms
+5. When a user joins the meeting late, the data will be fetched from the redis and displayed on the brainstorming and after that the livekit will handle the rest as mentioned in the previous point
+6. Then on the interval of few seconds, the data will be saved to the mongodb which will be like the final state of the brainstorming
+7. The brainstorming state will be maintained by the user's browser
+8. Once the meeting is ended, the data will be saved to the mongodb and the redis will be cleared
+
+Think of redis as a temporary storage (RAM) for the brainstorming state and mongodb as the final storage (ROM) for the brainstorming state and livekit as the broadcaster (transmitter)
+
+
+
+
+Audio recording working:
+
+Audio Recording — Complete Plan
+Recording (Frontend — Host's browser):
+
+Host joins meeting → Web Audio API creates AudioContext
+Mix host's mic track + all remote participant audio tracks into one MediaStream
+MediaRecorder.start(10000) — produces a chunk every 10 seconds
+Each chunk → POST /api/meeting/audio/chunk → stored in MongoDB GridFS
+If host disconnects → 30s grace period → if no reconnect → auto-end meeting
+Finalization (Backend — on meeting end):
+
+Meeting ends → backend reads all GridFS chunks in order → concatenates into one .webm buffer
+Uploads final .webm to Cloudinary (meeting_audio/ folder, resource_type: "video")
+Saves Cloudinary URL + public_id to meetingResources.audioRecordingUrl
+Deletes all temp chunks from GridFS immediately
+Cleanup (3-day auto-delete):
+
+Cleanup API finds meetings ended > 3 days ago with audio
+Calls cloudinary.uploader.destroy(public_id) → deletes audio file
+Clears audioRecordingUrl in MongoDB
+
+
+TODO:
+1. Fix the pdf issue of blurry lines
+2. Attendance with email and Start and end time
+3. Setup the environment for python and ai integration
