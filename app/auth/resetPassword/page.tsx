@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 function ResetPasswordForm() {
     const [newpassword, setnewpassword] = useState('');
@@ -31,8 +30,6 @@ function ResetPasswordForm() {
 
     const send = async () => {
         try {
-            console.log('Token:', token);
-            console.log('Password', newpassword);
             const res = await fetch('/api/auth/resetPassword', {
                 method: 'POST',
                 headers: {
@@ -51,7 +48,6 @@ function ResetPasswordForm() {
                 setMessage(data.error || 'Error in resetting password');
             }
         } catch (error) {
-            console.log('Error', error);
             setMessageType('error');
             setMessage('Error in resetting password');
         }
