@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
 
@@ -11,14 +12,9 @@ function ResetPasswordForm() {
     const [buttondisabled, setbuttondisabled] = useState(false);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('');
-    const [isClient, setIsClient] = useState(false);
 
     const params = useSearchParams();
     const token = params.get('token');
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
 
     useEffect(() => {
         if (newpassword.length > 0 && newpassword === confirmnewpassword) {
@@ -52,14 +48,6 @@ function ResetPasswordForm() {
             setMessage('Error in resetting password');
         }
     };
-
-    if (!isClient) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-        );
-    }
 
     return (
         <div className={styles.container}>
@@ -121,7 +109,15 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
-    return <ResetPasswordForm />;
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        }>
+            <ResetPasswordForm />
+        </Suspense>
+    );
 }
 
 const styles = {

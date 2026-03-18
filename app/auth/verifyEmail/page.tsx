@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -11,14 +11,9 @@ function VerifyEmailContent() {
     const token = searchParams.get('token');
 
     const [status, setStatus] = useState('loading');
-    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    useEffect(() => {
-        if (!token || !isClient) {
+        if (!token) {
             setStatus('waiting');
             return;
         }
@@ -46,15 +41,7 @@ function VerifyEmailContent() {
         };
 
         verify();
-    }, [token, isClient]);
-
-    if (!isClient) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-        );
-    }
+    }, [token]);
 
     return (
         <div className={styles.container}>
@@ -94,7 +81,15 @@ function VerifyEmailContent() {
 }
 
 export default function VerifyEmailPage() {
-    return <VerifyEmailContent />;
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        }>
+            <VerifyEmailContent />
+        </Suspense>
+    );
 }
 
 const styles = {
