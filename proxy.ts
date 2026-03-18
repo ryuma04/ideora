@@ -5,11 +5,17 @@ export function proxy(request: NextRequest) {
     
     // Define public vs protected paths
     const isPublicPath = path.startsWith('/auth');
-    const isProtectedPath = path.startsWith('/dashboard') || path.startsWith('/meeting');
+    const isMeetingPath = path.startsWith('/meeting'); // Accessible by both guests and logged-in users
+    const isProtectedPath = path.startsWith('/dashboard'); // Only logged-in users
 
     const token = request.cookies.get("token")?.value;
 
-    // Redirect unauthenticated users trying to access protected routes
+    // Allow meeting routes for everyone (guests join via shared links)
+    if (isMeetingPath) {
+        return NextResponse.next();
+    }
+
+    // Redirect unauthenticated users trying to access protected routes (dashboard)
     if (isProtectedPath && !token) {
         return NextResponse.redirect(new URL("/auth/login", request.url));
     }
