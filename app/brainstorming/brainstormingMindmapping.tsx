@@ -18,7 +18,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
-    const [initialData, setInitialData] = useState<any>(null);
+    const [initialData, setInitialData] = useState<any>({ elements: [] });
     const lastElementsRef = useRef<any[]>([]);
 
     // Fetch initial state
@@ -240,7 +240,8 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                     onChange={onChange}
                     theme="dark"
                     UIOptions={{
-                        canvasActions: { loadScene: false, export: false, saveAsImage: false, clearCanvas: false }
+                        canvasActions: { loadScene: false, export: false, saveAsImage: false, clearCanvas: false },
+                        welcomeScreen: false
                     }}
                 />
             </div>

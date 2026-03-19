@@ -232,8 +232,9 @@ export default function MeetingDocumentViewer() {
                         appState: { ...parsedState.appState, viewModeEnabled: true, theme: "light" },
                         scrollToContent: true
                     }}
-                    viewModeEnabled={true}
-                    theme="light"
+                    UIOptions={{
+                        welcomeScreen: false
+                    }}
                 />
             </div>
         );

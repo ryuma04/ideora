@@ -18,7 +18,7 @@ export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
-    const [initialData, setInitialData] = useState<any>(null);
+    const [initialData, setInitialData] = useState<any>({ elements: [] });
     const lastElementsRef = useRef<any[]>([]);
 
     // Fetch initial state
@@ -117,6 +117,9 @@ export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
                 initialData={initialData}
                 onChange={onChange}
                 theme="dark"
+                UIOptions={{
+                    welcomeScreen: false
+                }}
             />
         </div>
     );
