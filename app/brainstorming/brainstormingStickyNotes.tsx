@@ -1,165 +1,167 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Tldraw, Editor, createShapeId, getSnapshot, loadSnapshot } from "tldraw";
-import "tldraw/tldraw.css";
+import dynamic from "next/dynamic";
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+
+// Excalidraw is client-side only
+const Excalidraw = dynamic(
+  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+  { ssr: false }
+);
 
 interface StickyNotesProps {
     meetingId: string;
 }
 
 export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps) {
-    const [editor, setEditor] = useState<Editor | null>(null);
+    const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
+    const [initialData, setInitialData] = useState<any>(null);
+    const lastElementsRef = useRef<any[]>([]);
 
-    const handleMount = useCallback((editor: Editor) => {
-        setEditor(editor);
-        
-        // Match the application's overall dark theme for the canvas background
-        editor.user.updateUserPreferences({ colorScheme: 'dark' });
-
-        // Fetch initial state
+    // Fetch initial state
+    useEffect(() => {
         fetch(`/api/brainstorming/stickyNotes?meetingId=${meetingId}`)
             .then(res => res.json())
             .then(data => {
                 if (data.state) {
                     try {
                         const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-                        if (parsedState.store) {    
-                            const records = Object.values(parsedState.store) as any[];
-                            if(records.length > 0) {
-                                loadSnapshot(editor.store, parsedState);
-                            }
-                        } else {
-                           loadSnapshot(editor.store, parsedState);
-                        }
+                        setInitialData(parsedState);
+                        lastElementsRef.current = parsedState.elements || [];
                     } catch (e) {
-                         console.error("Failed to load sticky notes state", e);
+                         console.error("Failed to parse sticky notes state", e);
                     }
                 }
-                // Center on existing shapes if there are any
-                requestAnimationFrame(() => {
-                    const shapes = editor.getCurrentPageShapes();
-                    if (shapes.length > 0) {
-                        editor.zoomToFit();
-                    }
-                });
             })
             .catch(err => console.error("Initial fetch error:", err));
     }, [meetingId]);
 
     // Handle incoming real-time cursor/drawing data from other users
     const handleRemoteChange = useCallback((msg: any) => {
-        if (!editor || !msg.payload) return;
+        if (!excalidrawAPI || !msg.payload) return;
         
         try {
             const payloadStr = new TextDecoder().decode(msg.payload);
-            const changes = JSON.parse(payloadStr);
+            const remoteElements = JSON.parse(payloadStr);
 
-            editor.store.mergeRemoteChanges(() => {
-                const added = Object.values(changes.added || {});
-                const updated = Object.values(changes.updated || {}).map((u: any) => u[1]); // u[0] is old, u[1] is new
-                const removed = Object.keys(changes.removed || {});
-                
-                if (added.length > 0) editor.store.put(added as any);
-                if (updated.length > 0) editor.store.put(updated as any);
-                if (removed.length > 0) editor.store.remove(removed as any);
+            const currentElements = excalidrawAPI.getSceneElements();
+            const mergedElements = [...currentElements];
+
+            remoteElements.forEach((remoteEl: any) => {
+                const index = mergedElements.findIndex(el => el.id === remoteEl.id);
+                if (index === -1) {
+                    mergedElements.push(remoteEl);
+                } else if (remoteEl.version > mergedElements[index].version) {
+                    mergedElements[index] = remoteEl;
+                }
+                // Note: removed elements are trickier in Excalidraw (isDeleted property)
             });
+
+            excalidrawAPI.updateScene({ elements: mergedElements });
+            lastElementsRef.current = mergedElements;
         } catch (err) {
             console.error("Failed to parse incoming sticky notes update", err);
         }
-    }, [editor]);
+    }, [excalidrawAPI]);
 
     useDataChannel('sticky-notes-update', handleRemoteChange);
 
-    // Setup listener for changes
-    useEffect(() => {
-        if (!editor || !meetingId || !localParticipant) return;
+    const onChange = useCallback((elements: readonly any[], appState: any) => {
+        if (!localParticipant || !meetingId) return;
 
-        const unsubscribe = editor.store.listen(
-            (update) => {
-                if(Object.keys(update.changes.added).length === 0 &&
-                   Object.keys(update.changes.updated).length === 0 &&
-                   Object.keys(update.changes.removed).length === 0 ) {
-                     return;
-                }
-
-                try {
-                    const payloadBytes = new TextEncoder().encode(JSON.stringify(update.changes));
-                    localParticipant.publishData(payloadBytes, { topic: 'sticky-notes-update' }).catch((e: any) => {
-                         console.error("Failed to broadcast sticky notes update via LiveKit (Connection might be closed)", e);
-                    });
-                } catch (e) {
-                    console.error("Failed to encode sticky notes update", e);
-                }
-
-                if (saveTimeoutRef.current) {
-                    clearTimeout(saveTimeoutRef.current);
-                }
-
-                saveTimeoutRef.current = setTimeout(async () => {
-                    const snapshot = getSnapshot(editor.store);
-                    try {
-                        await fetch('/api/brainstorming/stickyNotes', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                meetingId,
-                                state: snapshot
-                            })
-                        });
-                    } catch (err) {
-                        console.error("Failed to sync sticky notes to backend", err);
-                    }
-                }, 1000);
-            },
-            { scope: 'document', source: 'user' }
-        );
-
-        return () => {
-            unsubscribe();
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, [editor, meetingId, localParticipant]);
-
-    const addStickyNote = (color: string) => {
-        if (!editor) return;
-
-        const noteId = createShapeId();
-        
-        // Calculate the center of the current viewport to spawn the note
-        const viewportCenter = editor.getViewportPageBounds().center;
-        
-        // Add a slight random offset so multiple clicks don't stack perfectly hiding each other
-        const randomOffsetX = (Math.random() - 0.5) * 50;
-        const randomOffsetY = (Math.random() - 0.5) * 50;
-
-        editor.createShape({
-            id: noteId,
-            type: 'note',
-            x: viewportCenter.x + randomOffsetX - 100, // Offset by half the width of a standard note approx
-            y: viewportCenter.y + randomOffsetY - 100,
-            props: {
-                color: color as any, // 'yellow', 'blue', 'green', 'light-violet', etc.
-                size: 'm',
-            },
+        const changedElements = elements.filter(el => {
+            const lastRootEl = lastElementsRef.current.find(le => le.id === el.id);
+            return !lastRootEl || lastRootEl.version < el.version;
         });
 
-        // Select the newly created note and jump into editing mode
-        editor.select(noteId);
-        setTimeout(() => {
-            try { editor.setEditingShape(noteId); } catch(e) {}
-        }, 50);
+        if (changedElements.length > 0) {
+            try {
+                const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
+                localParticipant.publishData(payloadBytes, { topic: 'sticky-notes-update' }).catch((e: any) => {
+                     console.error("Failed to broadcast sticky notes update via LiveKit", e);
+                });
+            } catch (e) {
+                console.error("Failed to encode sticky notes update", e);
+            }
+
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = setTimeout(async () => {
+                try {
+                    await fetch('/api/brainstorming/stickyNotes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            meetingId,
+                            state: { elements, appState }
+                        })
+                    });
+                } catch (err) {
+                    console.error("Failed to sync sticky notes to backend", err);
+                }
+            }, 1000);
+        }
+        lastElementsRef.current = [...elements];
+    }, [localParticipant, meetingId]);
+
+    const addStickyNote = (color: string) => {
+        if (!excalidrawAPI) return;
+
+        // Map tldraw colors to Excalidraw hex codes
+        const colorMap: Record<string, string> = {
+            'yellow': '#ffc034',
+            'green': '#40c057',
+            'light-blue': '#4dabf7',
+            'light-violet': '#e599f7',
+            'light-red': '#ff8787'
+        };
+
+        const hexColor = colorMap[color] || '#ffc034';
+        
+        // Excalidraw doesn't have a simple "createShape" like tldraw, 
+        // we have to manually construct a basic element or use common utilities if available.
+        // For simplicity, we'll use updateScene with a new element.
+        const currentElements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        
+        // Spawn near center
+        const x = appState.scrollX + (window.innerWidth / 2) - 100;
+        const y = appState.scrollY + (window.innerHeight / 2) - 100;
+        
+        const newNote: any = {
+            type: "rectangle",
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000000),
+            isDeleted: false,
+            id: `note-${Date.now()}`,
+            x,
+            y,
+            width: 200,
+            height: 200,
+            strokeColor: "#000000",
+            backgroundColor: hexColor,
+            fillStyle: "solid",
+            strokeWidth: 1,
+            strokeStyle: "solid",
+            roundness: { type: 3 },
+            seed: Math.floor(Math.random() * 1000000000),
+            opacity: 100,
+            groupIds: [],
+            boundElements: [],
+            link: null,
+            locked: false,
+        };
+
+        excalidrawAPI.updateScene({ elements: [...currentElements, newNote] });
     };
 
     const handleRecenter = () => {
-        if (!editor) return;
-        editor.zoomToFit({ animation: { duration: 300 } });
+        if (!excalidrawAPI) return;
+        excalidrawAPI.scrollToContent();
     };
 
-    // Beautiful curated colors corresponding to tldraw's native palette colors
     const colors = [
         { name: 'yellow', hex: 'bg-[#ffc034]', border: 'border-[#ffae00]' },
         { name: 'green', hex: 'bg-[#40c057]', border: 'border-[#37a44b]' },
@@ -173,14 +175,12 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
             
             {/* Custom Control Palette Overlay */}
             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-3 bg-slate-800/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-700 shadow-2xl">
-                
-                {/* Tools */}
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 mt-1 text-center leading-tight">
                     Tools
                 </p>
                 <div className="flex flex-col gap-2">
                     <button
-                        onClick={() => editor?.setCurrentTool('select')}
+                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "selection" } } })}
                         className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
                         title="Select Tool"
                     >
@@ -188,11 +188,19 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
                     </button>
                     
                     <button
-                        onClick={() => editor?.setCurrentTool('arrow')}
+                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "arrow" } } })}
                         className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
                         title="Draw Arrow"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                    </button>
+                    
+                    <button
+                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "freedraw" } } })}
+                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
+                        title="Free Draw"
+                    >
+                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
                 </div>
 
@@ -234,13 +242,21 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
                 <div className="space-y-1">
                     <p>• <span className="text-emerald-400 font-medium">Click a color</span> to drop a note</p>
                     <p>• <span className="text-white font-medium">Drag</span> the background to pan</p>
-                    <p>• <span className="text-white font-medium">Draw arrows</span> from edges to connect</p>
+                    <p>• <span className="text-white font-medium">Draw arrows</span> to connect ideas</p>
                 </div>
             </div>
 
             {/* Canvas Engine */}
             <div className="absolute inset-0 z-0">
-                <Tldraw hideUi onMount={handleMount} />
+                <Excalidraw
+                    excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
+                    initialData={initialData}
+                    onChange={onChange}
+                    theme="dark"
+                    UIOptions={{
+                        canvasActions: { loadScene: false, export: false, saveAsImage: false, clearCanvas: false }
+                    }}
+                />
             </div>
         </div>
     );

@@ -1,263 +1,201 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Tldraw, Editor, createShapeId, getSnapshot, loadSnapshot } from "tldraw";
-import "tldraw/tldraw.css";
+import dynamic from "next/dynamic";
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+
+// Excalidraw is client-side only
+const Excalidraw = dynamic(
+  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+  { ssr: false }
+);
 
 interface MindmapProps {
     meetingId: string;
 }
 
 export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
-    const [editor, setEditor] = useState<Editor | null>(null);
+    const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
+    const [initialData, setInitialData] = useState<any>(null);
+    const lastElementsRef = useRef<any[]>([]);
 
-    const handleMount = useCallback((editor: Editor) => {
-        setEditor(editor);
-        
-        // Force the internal canvas theme to be dark mode
-        editor.user.updateUserPreferences({ colorScheme: 'dark' });
-
-        // Wait for the next tick for the canvas size to settle
-        requestAnimationFrame(() => {
-            // Fetch initial state
-            fetch(`/api/brainstorming/mindmapping?meetingId=${meetingId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.state) {
-                        try {
-                            const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-                            if (parsedState.store) {    
-                                const records = Object.values(parsedState.store) as any[];
-                                if(records.length > 0) {
-                                    loadSnapshot(editor.store, parsedState);
-                                }
-                            } else {
-                               loadSnapshot(editor.store, parsedState);
-                            }
-                            editor.zoomToFit();
-                        } catch (e) {
-                             console.error("Failed to load mindmap state", e);
-                        }
-                    } else {
-                        // If the canvas is completely blank (no state), spawn a root mindmap node
-                        const shapes = editor.getCurrentPageShapes();
-                        if (shapes.length === 0) {
-                            const rootId = createShapeId("root");
-                            editor.createShape({
-                                id: rootId,
-                                type: 'geo',
-                                x: 100,
-                                y: 100,
-                                props: {
-                                    geo: 'rectangle',
-                                    w: 240,
-                                    h: 80,
-                                    fill: 'solid',
-                                    color: 'blue',
-                                    font: 'sans',
-                                    size: 'm',
-                                    align: 'middle'
-                                } as any
-                            });
-                            
-                            // Programmatically focus the camera onto the new core node
-                            editor.selectAll();
-                            editor.zoomToSelection({ animation: { duration: 0 } });
-                            editor.selectNone();
-
-                            // Instantly put the user into typing mode on the new root node!
-                            setTimeout(() => {
-                                try { editor.setEditingShape(rootId); } catch(e) {}
-                            }, 50);
-                        }
+    // Fetch initial state
+    useEffect(() => {
+        fetch(`/api/brainstorming/mindmapping?meetingId=${meetingId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.state) {
+                    try {
+                        const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
+                        setInitialData(parsedState);
+                        lastElementsRef.current = parsedState.elements || [];
+                    } catch (e) {
+                         console.error("Failed to parse mindmap state", e);
                     }
-                })
-                .catch(err => console.error("Initial fetch error:", err));
-        });
+                } else {
+                    // Initial root node if empty
+                    const rootX = (window.innerWidth / 2) - 100;
+                    const rootY = (window.innerHeight / 2) - 30;
+                    const rootNode: any = {
+                        type: "rectangle",
+                        id: "root-node",
+                        x: rootX,
+                        y: rootY,
+                        width: 200,
+                        height: 60,
+                        strokeColor: "#ffffff",
+                        backgroundColor: "#4c6ef5",
+                        fillStyle: "solid",
+                        roundness: { type: 3 },
+                        version: 1,
+                        versionNonce: 12345
+                    };
+                    setInitialData({ elements: [rootNode] });
+                    lastElementsRef.current = [rootNode];
+                }
+            })
+            .catch(err => console.error("Initial fetch error:", err));
     }, [meetingId]);
 
-    // Handle incoming real-time cursor/drawing data from other users
+    // Handle incoming real-time data
     const handleRemoteChange = useCallback((msg: any) => {
-        if (!editor || !msg.payload) return;
+        if (!excalidrawAPI || !msg.payload) return;
         
         try {
             const payloadStr = new TextDecoder().decode(msg.payload);
-            const changes = JSON.parse(payloadStr);
+            const remoteElements = JSON.parse(payloadStr);
 
-            // Merge changes seamlessly into our local Tldraw store without triggering our own 'user' listeners
-            editor.store.mergeRemoteChanges(() => {
-                const added = Object.values(changes.added || {});
-                const updated = Object.values(changes.updated || {}).map((u: any) => u[1]); // u[0] is old, u[1] is new
-                const removed = Object.keys(changes.removed || {});
-                
-                if (added.length > 0) editor.store.put(added as any);
-                if (updated.length > 0) editor.store.put(updated as any);
-                if (removed.length > 0) editor.store.remove(removed as any);
+            const currentElements = excalidrawAPI.getSceneElements();
+            const mergedElements = [...currentElements];
+
+            remoteElements.forEach((remoteEl: any) => {
+                const index = mergedElements.findIndex(el => el.id === remoteEl.id);
+                if (index === -1) {
+                    mergedElements.push(remoteEl);
+                } else if (remoteEl.version > mergedElements[index].version) {
+                    mergedElements[index] = remoteEl;
+                }
             });
+
+            excalidrawAPI.updateScene({ elements: mergedElements });
+            lastElementsRef.current = mergedElements;
         } catch (err) {
             console.error("Failed to parse incoming mindmap update", err);
         }
-    }, [editor]);
+    }, [excalidrawAPI]);
 
     useDataChannel('mindmap-update', handleRemoteChange);
 
-    // Setup listener for changes
-    useEffect(() => {
-        if (!editor || !meetingId || !localParticipant) return;
+    const onChange = useCallback((elements: readonly any[], appState: any) => {
+        if (!localParticipant || !meetingId) return;
 
-        const unsubscribe = editor.store.listen(
-            (update) => {
-                if(Object.keys(update.changes.added).length === 0 &&
-                   Object.keys(update.changes.updated).length === 0 &&
-                   Object.keys(update.changes.removed).length === 0 ) {
-                     return;
-                }
+        const changedElements = elements.filter(el => {
+            const lastRootEl = lastElementsRef.current.find(le => le.id === el.id);
+            return !lastRootEl || lastRootEl.version < el.version;
+        });
 
-                // 1. Instantly broadcast this specific stroke/change to everyone else via LiveKit!
-                try {
-                    const payloadBytes = new TextEncoder().encode(JSON.stringify(update.changes));
-                    localParticipant.publishData(payloadBytes, { topic: 'mindmap-update' }).catch((e: any) => {
-                         console.error("Failed to broadcast mindmap update via LiveKit (Connection might be closed)", e);
-                    });
-                } catch (e) {
-                    console.error("Failed to encode payload via LiveKit", e);
-                }
+        if (changedElements.length > 0) {
+            try {
+                const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
+                localParticipant.publishData(payloadBytes, { topic: 'mindmap-update' }).catch((e: any) => {
+                     console.error("Failed to broadcast mindmap update via LiveKit", e);
+                });
+            } catch (e) {
+                console.error("Failed to encode mindmap update", e);
+            }
 
-                // 2. Debounce the background save to Redis/MongoDB
-                if (saveTimeoutRef.current) {
-                    clearTimeout(saveTimeoutRef.current);
-                }
-
-                saveTimeoutRef.current = setTimeout(async () => {
-                    const snapshot = getSnapshot(editor.store);
-                    try {
-                        await fetch('/api/brainstorming/mindmapping', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                meetingId,
-                                state: snapshot
-                            })
-                        });
-                    } catch (err) {
-                        console.error("Failed to sync mindmap to backend", err);
-                    }
-                }, 1000); // Wait 1 second after last edit before sending
-            },
-            { scope: 'document', source: 'user' }
-        );
-
-        return () => {
-            unsubscribe();
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, [editor, meetingId, localParticipant]);
+            saveTimeoutRef.current = setTimeout(async () => {
+                try {
+                    await fetch('/api/brainstorming/mindmapping', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            meetingId,
+                            state: { elements, appState }
+                        })
+                    });
+                } catch (err) {
+                    console.error("Failed to sync mindmap to backend", err);
+                }
+            }, 1000);
+        }
+        lastElementsRef.current = [...elements];
+    }, [localParticipant, meetingId]);
 
     const handleAddChild = () => {
-        if (!editor) return;
+        if (!excalidrawAPI) return;
         
-        const selectedShapeIds = editor.getSelectedShapeIds();
-        if (selectedShapeIds.length !== 1) {
+        const selectedElements = excalidrawAPI.getSceneElements().filter((el: any) => 
+            excalidrawAPI.getAppState().selectedElementIds[el.id]
+        );
+
+        if (selectedElements.length !== 1) {
             alert("Please select exactly one parent node to branch off from.");
             return;
         }
 
-        const parentId = selectedShapeIds[0];
-        const parentShape = editor.getShape(parentId);
+        const parent = selectedElements[0];
+        const currentElements = excalidrawAPI.getSceneElements();
         
-        if (!parentShape) return;
+        const childId = `node-${Date.now()}`;
+        const arrowId = `arrow-${Date.now()}`;
+        
+        const childX = parent.x + parent.width + 100;
+        const childY = parent.y + (Math.random() - 0.5) * 100;
 
-        // Calculate simple offset for the new node to spawn to the right
-        const childId = createShapeId();
-        const arrowId = createShapeId();
-
-        const parentW = (parentShape.props as any).w || 200;
-        const newX = parentShape.x + parentW + 120; // 120px to the right
-        const newY = parentShape.y + ((Math.random() - 0.5) * 150); // slight random vertical offset so they don't exactly stack
-
-        // Define colors randomly for children nodes to make the map look lively
-        const colors = ['light-blue', 'green', 'light-green', 'yellow', 'orange', 'red'];
+        const colors = ['#74c0fc', '#63e6be', '#94d82d', '#ffd43b', '#ff922b', '#ff8787'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-        editor.createShapes([
-            {
-                id: childId,
-                type: 'geo',
-                x: newX,
-                y: newY,
-                props: {
-                    geo: 'rectangle',
-                    w: 200,
-                    h: 60,
-                    fill: 'solid',
-                    color: randomColor,
-                    font: 'sans',
-                    size: 's',
-                    align: 'middle'
-                } as any
-            },
-            {
-                id: arrowId,
-                type: 'arrow',
-                props: {
-                    start: { x: 0, y: 0 },
-                    end: { x: 0, y: 0 },
-                    color: 'white',
-                    fill: 'none' // Simple clean lines
-                } as any
-            }
-        ]);
+        const childNode: any = {
+            type: "rectangle",
+            id: childId,
+            x: childX,
+            y: childY,
+            width: 150,
+            height: 50,
+            strokeColor: "#ffffff",
+            backgroundColor: randomColor,
+            fillStyle: "solid",
+            roundness: { type: 3 },
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000)
+        };
 
-        // In tldraw V2, bindings are created separately from the shape properties
-        editor.createBinding({
-            type: 'arrow',
-            fromId: arrowId,
-            toId: parentId,
-            props: {
-                terminal: 'start',
-                normalizedAnchor: { x: 0.5, y: 0.5 },
-                isExact: false,
-                isPrecise: true,
-            }
+        const arrow: any = {
+            type: "arrow",
+            id: arrowId,
+            x: parent.x + parent.width,
+            y: parent.y + parent.height / 2,
+            width: childX - (parent.x + parent.width),
+            height: (childY + 25) - (parent.y + parent.height / 2),
+            strokeColor: "#ffffff",
+            strokeWidth: 2,
+            strokeStyle: "solid",
+            points: [[0, 0], [childX - (parent.x + parent.width), (childY + 25) - (parent.y + parent.height / 2)]],
+            startBinding: { elementId: parent.id, focus: 0.5, gap: 1 },
+            endBinding: { elementId: childId, focus: 0.5, gap: 1 },
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000)
+        };
+
+        excalidrawAPI.updateScene({ 
+            elements: [...currentElements, childNode, arrow],
+            appState: { selectedElementIds: { [childId]: true } }
         });
-
-        editor.createBinding({
-            type: 'arrow',
-            fromId: arrowId,
-            toId: childId,
-            props: {
-                terminal: 'end',
-                normalizedAnchor: { x: 0.5, y: 0.5 },
-                isExact: false,
-                isPrecise: true,
-            }
-        });
-
-        // Select the new child heavily so the user can see it sprouted
-        editor.select(childId);
-        
-        // Push them straight into editing mode so they don't have to double click
-        setTimeout(() => {
-            try { editor.setEditingShape(childId); } catch(e) {}
-        }, 50);
     };
 
     const handleRecenter = () => {
-        if (!editor) return;
-        if (editor.getCurrentPageShapes().length > 0) {
-            editor.selectAll();
-            editor.zoomToSelection({ animation: { duration: 300 } });
-            editor.selectNone();
-        }
+        if (!excalidrawAPI) return;
+        excalidrawAPI.scrollToContent();
     };
 
     return (
         <div className="w-full h-full relative bg-slate-800 overflow-hidden">
             
-            {/* Custom Control Overlay built specifically for Mind Mapping */}
+            {/* Custom Control Overlay */}
             <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <button
                     onClick={handleAddChild}
@@ -294,9 +232,17 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                 </div>
             </div>
 
-            {/* We use tldraw, but completely strip all its regular UI components out so it just acts as an engine */}
+            {/* Canvas Engine */}
             <div className="absolute inset-0 z-0">
-                <Tldraw hideUi onMount={handleMount} />
+                <Excalidraw
+                    excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
+                    initialData={initialData}
+                    onChange={onChange}
+                    theme="dark"
+                    UIOptions={{
+                        canvasActions: { loadScene: false, export: false, saveAsImage: false, clearCanvas: false }
+                    }}
+                />
             </div>
         </div>
     );
