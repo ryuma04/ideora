@@ -18,7 +18,56 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
-    const [initialData, setInitialData] = useState<any>({ elements: [] });
+    const [initialData, setInitialData] = useState<any>(() => {
+        const rootX = 500; // Fixed starting center for immediate render
+        const rootY = 300;
+        return {
+            elements: [
+                {
+                    type: "rectangle",
+                    id: "root-node",
+                    x: rootX,
+                    y: rootY,
+                    width: 200,
+                    height: 60,
+                    strokeColor: "#ffffff",
+                    backgroundColor: "#4c6ef5",
+                    fillStyle: "solid",
+                    roundness: { type: 3 },
+                    version: 1,
+                    versionNonce: 12345,
+                    groupIds: [],
+                    boundElements: [],
+                    locked: false,
+                    link: null,
+                    opacity: 100,
+                    strokeWidth: 2,
+                    strokeStyle: "solid",
+                    seed: 123
+                },
+                {
+                    type: "text",
+                    id: "root-text",
+                    x: rootX + 100,
+                    y: rootY + 30,
+                    text: "Main Idea",
+                    fontSize: 24,
+                    fontFamily: 1,
+                    textAlign: "center",
+                    verticalAlign: "middle",
+                    strokeColor: "#ffffff",
+                    version: 1,
+                    versionNonce: 54321,
+                    groupIds: [],
+                    boundElements: [],
+                    locked: false,
+                    link: null,
+                    opacity: 100,
+                    seed: 456
+                }
+            ]
+        };
+    });
     const lastElementsRef = useRef<any[]>([]);
 
     // Fetch initial state
