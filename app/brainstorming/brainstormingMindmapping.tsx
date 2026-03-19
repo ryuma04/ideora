@@ -111,15 +111,20 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const onChange = useCallback((elements: readonly any[], appState: any) => {
         if (!localParticipant || !meetingId) return;
 
-        // Preserve arrow colors
-        const preservedElements = elements.map((el: any) => {
-            if (el.type === "arrow" && !el.strokeColor) {
-                return { ...el, strokeColor: "#ffffff" };  // ← Ensure white
+        // Force white color on all arrows
+        const fixedElements = elements.map((el: any) => {
+            if (el.type === "arrow") {
+                return {
+                    ...el,
+                    strokeColor: "#ffffff",
+                    strokeWidth: 2,
+                    endArrowhead: "arrow",
+                };
             }
             return el;
         });
 
-        const changedElements = preservedElements.filter(el => {
+        const changedElements = fixedElements.filter(el => {
             const lastRootEl = lastElementsRef.current.find(le => le.id === el.id);
             return !lastRootEl || lastRootEl.version < el.version;
         });
@@ -142,7 +147,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             meetingId,
-                            state: { elements: preservedElements, appState }
+                            state: { elements: fixedElements, appState }
                         })
                     });
                 } catch (err) {
@@ -150,7 +155,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                 }
             }, 1000);
         }
-        lastElementsRef.current = [...preservedElements];
+        lastElementsRef.current = [...fixedElements];
     }, [localParticipant, meetingId]);
 
     const handleAddChild = async () => {
@@ -221,7 +226,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                 y: parent.y + parent.height / 2,
                 width: childX - (parent.x + parent.width),
                 height: (childY + 25) - (parent.y + parent.height / 2),
-                strokeColor: "#ffffff",  // ← WHITE ARROWS
+                strokeColor: "#ffffff",
                 strokeWidth: 2,
                 roundness: { type: 2 },
                 start: { id: parent.id },
