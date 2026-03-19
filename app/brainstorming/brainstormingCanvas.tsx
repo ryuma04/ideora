@@ -48,7 +48,7 @@ export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
             const remoteElements = JSON.parse(payloadStr);
 
             // Merge remote elements with local ones
-            const currentElements = excalidrawAPI.getSceneElements();
+            const currentElements = excalidrawAPI.getSceneElements() || [];
             const mergedElements = [...currentElements];
 
             remoteElements.forEach((remoteEl: any) => {

@@ -47,7 +47,7 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
             const payloadStr = new TextDecoder().decode(msg.payload);
             const remoteElements = JSON.parse(payloadStr);
 
-            const currentElements = excalidrawAPI.getSceneElements();
+            const currentElements = excalidrawAPI.getSceneElements() || [];
             const mergedElements = [...currentElements];
 
             remoteElements.forEach((remoteEl: any) => {
@@ -123,8 +123,8 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
         // Excalidraw doesn't have a simple "createShape" like tldraw, 
         // we have to manually construct a basic element or use common utilities if available.
         // For simplicity, we'll use updateScene with a new element.
-        const currentElements = excalidrawAPI.getSceneElements();
-        const appState = excalidrawAPI.getAppState();
+        const currentElements = excalidrawAPI.getSceneElements() || [];
+        const appState = excalidrawAPI.getAppState() || {};
         
         // Spawn near center
         const x = appState.scrollX + (window.innerWidth / 2) - 100;

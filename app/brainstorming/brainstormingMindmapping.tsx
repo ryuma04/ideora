@@ -52,8 +52,22 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                         version: 1,
                         versionNonce: 12345
                     };
-                    setInitialData({ elements: [rootNode] });
-                    lastElementsRef.current = [rootNode];
+                    const rootText: any = {
+                        type: "text",
+                        id: "root-text",
+                        x: rootX + 100,
+                        y: rootY + 30,
+                        text: "Main Idea",
+                        fontSize: 24,
+                        fontFamily: 1,
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        strokeColor: "#ffffff",
+                        version: 1,
+                        versionNonce: 54321
+                    };
+                    setInitialData({ elements: [rootNode, rootText] });
+                    lastElementsRef.current = [rootNode, rootText];
                 }
             })
             .catch(err => console.error("Initial fetch error:", err));
@@ -67,7 +81,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             const payloadStr = new TextDecoder().decode(msg.payload);
             const remoteElements = JSON.parse(payloadStr);
 
-            const currentElements = excalidrawAPI.getSceneElements();
+            const currentElements = excalidrawAPI.getSceneElements() || [];
             const mergedElements = [...currentElements];
 
             remoteElements.forEach((remoteEl: any) => {
@@ -128,7 +142,8 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const handleAddChild = () => {
         if (!excalidrawAPI) return;
         
-        const selectedElements = excalidrawAPI.getSceneElements().filter((el: any) => 
+        const sceneElements = excalidrawAPI.getSceneElements() || [];
+        const selectedElements = sceneElements.filter((el: any) => 
             excalidrawAPI.getAppState().selectedElementIds[el.id]
         );
 
@@ -138,7 +153,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         }
 
         const parent = selectedElements[0];
-        const currentElements = excalidrawAPI.getSceneElements();
+        const currentElements = excalidrawAPI.getSceneElements() || [];
         
         const childId = `node-${Date.now()}`;
         const arrowId = `arrow-${Date.now()}`;
@@ -164,6 +179,23 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             versionNonce: Math.floor(Math.random() * 1000000)
         };
 
+        const textId = `text-${Date.now()}`;
+        const textNode: any = {
+            type: "text",
+            id: textId,
+            x: childX + 75,
+            y: childY + 25,
+            text: "New Idea",
+            fontSize: 20,
+            fontFamily: 1,
+            textAlign: "center",
+            verticalAlign: "middle",
+            strokeColor: "#ffffff",
+            backgroundColor: "transparent",
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000)
+        };
+
         const arrow: any = {
             type: "arrow",
             id: arrowId,
@@ -182,8 +214,8 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         };
 
         excalidrawAPI.updateScene({ 
-            elements: [...currentElements, childNode, arrow],
-            appState: { selectedElementIds: { [childId]: true } }
+            elements: [...currentElements, childNode, textNode, arrow],
+            appState: { selectedElementIds: { [childId]: true, [textId]: true } }
         });
     };
 
