@@ -109,7 +109,6 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
     const addStickyNote = (color: string) => {
         if (!excalidrawAPI) return;
 
-        // Map tldraw colors to Excalidraw hex codes
         const colorMap: Record<string, string> = {
             'yellow': '#ffc034',
             'green': '#40c057',
@@ -120,22 +119,24 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
 
         const hexColor = colorMap[color] || '#ffc034';
         
-        // Excalidraw doesn't have a simple "createShape" like tldraw, 
-        // we have to manually construct a basic element or use common utilities if available.
-        // For simplicity, we'll use updateScene with a new element.
         const currentElements = excalidrawAPI.getSceneElements() || [];
         const appState = excalidrawAPI.getAppState() || {};
         
-        // Spawn near center
-        const x = appState.scrollX + (window.innerWidth / 2) - 100;
-        const y = appState.scrollY + (window.innerHeight / 2) - 100;
+        // Convert screen center to canvas coordinates
+        const zoom = appState.zoom?.value || 1;
+        const x = (-appState.scrollX + window.innerWidth / 2) / zoom - 100;
+        const y = (-appState.scrollY + window.innerHeight / 2) / zoom - 100;
+
+        const now = Date.now();
+        const noteId = `note-${now}`;
+        const textId = `note-text-${now}`;
         
         const newNote: any = {
             type: "rectangle",
             version: 1,
             versionNonce: Math.floor(Math.random() * 1000000000),
             isDeleted: false,
-            id: `note-${Date.now()}`,
+            id: noteId,
             x,
             y,
             width: 200,
@@ -149,12 +150,42 @@ export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps
             seed: Math.floor(Math.random() * 1000000000),
             opacity: 100,
             groupIds: [],
-            boundElements: [],
+            boundElements: [{ type: "text", id: textId }],
             link: null,
             locked: false,
         };
 
-        excalidrawAPI.updateScene({ elements: [...currentElements, newNote] });
+        const noteText: any = {
+            type: "text",
+            id: textId,
+            x: x + 100,
+            y: y + 100,
+            width: 0,
+            height: 0,
+            text: "",
+            fontSize: 20,
+            fontFamily: 1,
+            textAlign: "center",
+            verticalAlign: "middle",
+            strokeColor: "#1e1e1e",
+            backgroundColor: "transparent",
+            containerId: noteId,
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000000),
+            isDeleted: false,
+            groupIds: [],
+            boundElements: [],
+            link: null,
+            locked: false,
+            seed: Math.floor(Math.random() * 1000000000),
+            opacity: 100,
+            autoResize: true,
+        };
+
+        excalidrawAPI.updateScene({ 
+            elements: [...currentElements, newNote, noteText],
+            appState: { selectedElementIds: { [noteId]: true } }
+        });
     };
 
     const handleRecenter = () => {

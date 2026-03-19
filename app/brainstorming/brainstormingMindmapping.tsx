@@ -18,55 +18,84 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
-    const [initialData, setInitialData] = useState<any>(() => {
-        const rootX = 500; // Fixed starting center for immediate render
-        const rootY = 300;
-        return {
-            elements: [
-                {
-                    type: "rectangle",
-                    id: "root-node",
-                    x: rootX,
-                    y: rootY,
-                    width: 200,
-                    height: 60,
-                    strokeColor: "#ffffff",
-                    backgroundColor: "#4c6ef5",
-                    fillStyle: "solid",
-                    roundness: { type: 3 },
-                    version: 1,
-                    versionNonce: 12345,
-                    groupIds: [],
-                    boundElements: [],
-                    locked: false,
-                    link: null,
-                    opacity: 100,
-                    strokeWidth: 2,
-                    strokeStyle: "solid",
-                    seed: 123
-                },
-                {
-                    type: "text",
-                    id: "root-text",
-                    x: rootX + 100,
-                    y: rootY + 30,
-                    text: "Main Idea",
-                    fontSize: 24,
-                    fontFamily: 1,
-                    textAlign: "center",
-                    verticalAlign: "middle",
-                    strokeColor: "#ffffff",
-                    version: 1,
-                    versionNonce: 54321,
-                    groupIds: [],
-                    boundElements: [],
-                    locked: false,
-                    link: null,
-                    opacity: 100,
-                    seed: 456
-                }
-            ]
+
+    // Helper to create a rectangle node with bound text inside it
+    const createNodeElements = (
+        nodeId: string,
+        textId: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        bgColor: string,
+        label: string,
+        fontSize: number,
+        extraBoundElements: { type: string; id: string }[] = []
+    ) => {
+        const rect: any = {
+            type: "rectangle",
+            id: nodeId,
+            x,
+            y,
+            width,
+            height,
+            strokeColor: bgColor,
+            backgroundColor: bgColor,
+            fillStyle: "solid",
+            roundness: { type: 3 },
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000),
+            groupIds: [],
+            boundElements: [
+                { type: "text", id: textId },
+                ...extraBoundElements
+            ],
+            locked: false,
+            link: null,
+            opacity: 100,
+            strokeWidth: 2,
+            strokeStyle: "solid",
+            seed: Math.floor(Math.random() * 1000000),
+            isDeleted: false,
         };
+        const text: any = {
+            type: "text",
+            id: textId,
+            x: x + width / 2,
+            y: y + height / 2,
+            width: 0,
+            height: 0,
+            text: label,
+            fontSize,
+            fontFamily: 1,
+            textAlign: "center",
+            verticalAlign: "middle",
+            strokeColor: "#ffffff",
+            backgroundColor: "transparent",
+            containerId: nodeId,
+            version: 1,
+            versionNonce: Math.floor(Math.random() * 1000000),
+            groupIds: [],
+            boundElements: [],
+            locked: false,
+            link: null,
+            opacity: 100,
+            seed: Math.floor(Math.random() * 1000000),
+            isDeleted: false,
+            autoResize: true,
+        };
+        return { rect, text };
+    };
+
+    const [initialData, setInitialData] = useState<any>(() => {
+        const rootX = 500;
+        const rootY = 300;
+        const { rect, text } = createNodeElements(
+            "root-node", "root-text",
+            rootX, rootY, 200, 60,
+            "#4c6ef5", "Main Idea", 24
+        );
+        return { elements: [rect, text] };
     });
     const lastElementsRef = useRef<any[]>([]);
 
@@ -84,53 +113,15 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                          console.error("Failed to parse mindmap state", e);
                     }
                 } else {
-                    // Initial root node if empty
                     const rootX = (window.innerWidth / 2) - 100;
                     const rootY = (window.innerHeight / 2) - 30;
-                    const rootNode: any = {
-                        type: "rectangle",
-                        id: "root-node",
-                        x: rootX,
-                        y: rootY,
-                        width: 200,
-                        height: 60,
-                        strokeColor: "#ffffff",
-                        backgroundColor: "#4c6ef5",
-                        fillStyle: "solid",
-                        roundness: { type: 3 },
-                        version: 1,
-                        versionNonce: 12345,
-                        groupIds: [],
-                        boundElements: [],
-                        locked: false,
-                        link: null,
-                        opacity: 100,
-                        strokeWidth: 2,
-                        strokeStyle: "solid",
-                        seed: 123
-                    };
-                    const rootText: any = {
-                        type: "text",
-                        id: "root-text",
-                        x: rootX + 100,
-                        y: rootY + 30,
-                        text: "Main Idea",
-                        fontSize: 24,
-                        fontFamily: 1,
-                        textAlign: "center",
-                        verticalAlign: "middle",
-                        strokeColor: "#ffffff",
-                        version: 1,
-                        versionNonce: 54321,
-                        groupIds: [],
-                        boundElements: [],
-                        locked: false,
-                        link: null,
-                        opacity: 100,
-                        seed: 456
-                    };
-                    setInitialData({ elements: [rootNode, rootText] });
-                    lastElementsRef.current = [rootNode, rootText];
+                    const { rect, text } = createNodeElements(
+                        "root-node", "root-text",
+                        rootX, rootY, 200, 60,
+                        "#4c6ef5", "Main Idea", 24
+                    );
+                    setInitialData({ elements: [rect, text] });
+                    lastElementsRef.current = [rect, text];
                 }
             })
             .catch(err => console.error("Initial fetch error:", err));
@@ -206,86 +197,72 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         if (!excalidrawAPI) return;
         
         const sceneElements = excalidrawAPI.getSceneElements() || [];
-        const selectedElements = sceneElements.filter((el: any) => 
-            excalidrawAPI.getAppState().selectedElementIds[el.id]
+        const appState = excalidrawAPI.getAppState();
+
+        // Find the selected rectangle node (skip text elements)
+        const selectedRects = sceneElements.filter((el: any) => 
+            appState.selectedElementIds[el.id] && el.type === "rectangle"
         );
 
-        if (selectedElements.length !== 1) {
-            alert("Please select exactly one parent node to branch off from.");
+        // If user selected a text element, find its parent rectangle
+        let parent: any = null;
+        if (selectedRects.length === 1) {
+            parent = selectedRects[0];
+        } else {
+            const selectedAll = sceneElements.filter((el: any) => appState.selectedElementIds[el.id]);
+            if (selectedAll.length === 1 && selectedAll[0].type === "text" && selectedAll[0].containerId) {
+                parent = sceneElements.find((el: any) => el.id === selectedAll[0].containerId);
+            }
+        }
+
+        if (!parent) {
+            alert("Please select exactly one node to branch off from.");
             return;
         }
 
-        const parent = selectedElements[0];
-        const currentElements = excalidrawAPI.getSceneElements() || [];
+        const currentElements = [...sceneElements];
         
-        const childId = `node-${Date.now()}`;
-        const arrowId = `arrow-${Date.now()}`;
+        const now = Date.now();
+        const childId = `node-${now}`;
+        const textId = `text-${now}`;
+        const arrowId = `arrow-${now}`;
         
-        const childX = parent.x + parent.width + 100;
-        const childY = parent.y + (Math.random() - 0.5) * 100;
+        const childX = parent.x + parent.width + 120;
+        const childY = parent.y + (Math.random() - 0.5) * 120;
 
-        const colors = ['#74c0fc', '#63e6be', '#94d82d', '#ffd43b', '#ff922b', '#ff8787'];
+        const colors = ['#ff922b', '#74c0fc', '#63e6be', '#94d82d', '#ffd43b', '#ff8787', '#e599f7'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-        const childNode: any = {
-            type: "rectangle",
-            id: childId,
-            x: childX,
-            y: childY,
-            width: 150,
-            height: 50,
-            strokeColor: "#ffffff",
-            backgroundColor: randomColor,
-            fillStyle: "solid",
-            roundness: { type: 3 },
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000),
-            groupIds: [],
-            boundElements: [{ type: "arrow", id: arrowId }], // Text and Arrow will bind
-            locked: false,
-            link: null,
-            opacity: 100,
-            strokeWidth: 2,
-            strokeStyle: "solid",
-            seed: Math.floor(Math.random() * 1000000)
-        };
+        // Create child node with bound text and arrow binding
+        const { rect: childNode, text: textNode } = createNodeElements(
+            childId, textId,
+            childX, childY, 160, 50,
+            randomColor, "New Idea", 18,
+            [{ type: "arrow", id: arrowId }]
+        );
 
-        const textId = `text-${Date.now()}`;
-        const textNode: any = {
-            type: "text",
-            id: textId,
-            x: childX + 75,
-            y: childY + 25,
-            text: "New Idea",
-            fontSize: 20,
-            fontFamily: 1,
-            textAlign: "center",
-            verticalAlign: "middle",
-            strokeColor: "#ffffff",
-            backgroundColor: "transparent",
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000),
-            groupIds: [],
-            boundElements: [],
-            locked: false,
-            link: null,
-            opacity: 100,
-            seed: Math.floor(Math.random() * 1000000)
-        };
+        // Create arrow connecting parent to child
+        const arrowStartX = parent.x + parent.width;
+        const arrowStartY = parent.y + parent.height / 2;
+        const arrowEndX = childX;
+        const arrowEndY = childY + 25;
 
         const arrow: any = {
             type: "arrow",
             id: arrowId,
-            x: parent.x + parent.width,
-            y: parent.y + parent.height / 2,
-            width: childX - (parent.x + parent.width),
-            height: (childY + 25) - (parent.y + parent.height / 2),
-            strokeColor: "#ffffff",
+            x: arrowStartX,
+            y: arrowStartY,
+            width: arrowEndX - arrowStartX,
+            height: arrowEndY - arrowStartY,
+            strokeColor: "#adb5bd",
             strokeWidth: 2,
             strokeStyle: "solid",
-            points: [[0, 0], [childX - (parent.x + parent.width), (childY + 25) - (parent.y + parent.height / 2)]],
-            startBinding: { elementId: parent.id, focus: 0.5, gap: 1 },
-            endBinding: { elementId: childId, focus: 0.5, gap: 1 },
+            fillStyle: "solid",
+            points: [[0, 0], [arrowEndX - arrowStartX, arrowEndY - arrowStartY]],
+            startBinding: { elementId: parent.id, focus: 0, gap: 5 },
+            endBinding: { elementId: childId, focus: 0, gap: 5 },
+            endArrowhead: "arrow",
+            startArrowhead: null,
             version: 1,
             versionNonce: Math.floor(Math.random() * 1000000),
             groupIds: [],
@@ -293,12 +270,29 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             locked: false,
             link: null,
             opacity: 100,
-            seed: Math.floor(Math.random() * 1000000)
+            seed: Math.floor(Math.random() * 1000000),
+            isDeleted: false,
+            roundness: { type: 2 },
         };
+
+        // Update parent's boundElements to include the new arrow
+        const parentIndex = currentElements.findIndex((el: any) => el.id === parent.id);
+        if (parentIndex !== -1) {
+            const existingBound = currentElements[parentIndex].boundElements || [];
+            const alreadyHasArrow = existingBound.some((b: any) => b.id === arrowId);
+            if (!alreadyHasArrow) {
+                currentElements[parentIndex] = {
+                    ...currentElements[parentIndex],
+                    boundElements: [...existingBound, { type: "arrow", id: arrowId }],
+                    version: (currentElements[parentIndex].version || 1) + 1,
+                    versionNonce: Math.floor(Math.random() * 1000000),
+                };
+            }
+        }
 
         excalidrawAPI.updateScene({ 
             elements: [...currentElements, childNode, textNode, arrow],
-            appState: { selectedElementIds: { [childId]: true, [textId]: true } }
+            appState: { selectedElementIds: { [childId]: true } }
         });
     };
 
