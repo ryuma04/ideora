@@ -18,92 +18,43 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { localParticipant } = useLocalParticipant();
-
-    // Helper to create a rectangle node with bound text inside it
-    const createNodeElements = (
-        nodeId: string,
-        textId: string,
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        bgColor: string,
-        label: string,
-        fontSize: number,
-        extraBoundElements: { type: string; id: string }[] = []
-    ) => {
-        const rect: any = {
-            type: "rectangle",
-            id: nodeId,
-            x,
-            y,
-            width,
-            height,
-            strokeColor: bgColor,
-            backgroundColor: bgColor,
-            fillStyle: "solid",
-            roundness: { type: 3 },
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000),
-            groupIds: [],
-            boundElements: [
-                { type: "text", id: textId },
-                ...extraBoundElements
-            ],
-            locked: false,
-            link: null,
-            opacity: 100,
-            strokeWidth: 2,
-            strokeStyle: "solid",
-            seed: Math.floor(Math.random() * 1000000),
-            isDeleted: false,
-        };
-        const text: any = {
-            type: "text",
-            id: textId,
-            x: x + width / 2,
-            y: y + height / 2,
-            width: 0,
-            height: 0,
-            text: label,
-            fontSize,
-            fontFamily: 1,
-            textAlign: "center",
-            verticalAlign: "middle",
-            strokeColor: "#ffffff",
-            backgroundColor: "transparent",
-            containerId: nodeId,
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000),
-            groupIds: [],
-            boundElements: [],
-            locked: false,
-            link: null,
-            opacity: 100,
-            seed: Math.floor(Math.random() * 1000000),
-            isDeleted: false,
-            autoResize: true,
-        };
-        return { rect, text };
-    };
-
-    const [initialData, setInitialData] = useState<any>(() => {
-        const rootX = 500;
-        const rootY = 300;
-        const { rect, text } = createNodeElements(
-            "root-node", "root-text",
-            rootX, rootY, 200, 60,
-            "#4c6ef5", "Main Idea", 24
-        );
-        return { elements: [rect, text] };
-    });
+    const [initialData, setInitialData] = useState<any>(null);
     const lastElementsRef = useRef<any[]>([]);
+    const initializedRef = useRef(false);
 
-    // Fetch initial state
+    // Build the default root elements using convertToExcalidrawElements
+    const buildRootElements = useCallback(async (rootX: number, rootY: number) => {
+        const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+        return convertToExcalidrawElements([
+            {
+                type: "rectangle",
+                id: "root-node",
+                x: rootX,
+                y: rootY,
+                width: 200,
+                height: 60,
+                backgroundColor: "#4c6ef5",
+                strokeColor: "#4c6ef5",
+                fillStyle: "solid",
+                roundness: { type: 3 },
+                strokeWidth: 2,
+                label: {
+                    text: "Main Idea",
+                    fontSize: 24,
+                    strokeColor: "#ffffff",
+                },
+            },
+        ]);
+    }, []);
+
+    // Fetch initial state or create default root
     useEffect(() => {
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
         fetch(`/api/brainstorming/mindmapping?meetingId=${meetingId}`)
             .then(res => res.json())
-            .then(data => {
+            .then(async (data) => {
                 if (data.state) {
                     try {
                         const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
@@ -115,17 +66,18 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                 } else {
                     const rootX = (window.innerWidth / 2) - 100;
                     const rootY = (window.innerHeight / 2) - 30;
-                    const { rect, text } = createNodeElements(
-                        "root-node", "root-text",
-                        rootX, rootY, 200, 60,
-                        "#4c6ef5", "Main Idea", 24
-                    );
-                    setInitialData({ elements: [rect, text] });
-                    lastElementsRef.current = [rect, text];
+                    const elements = await buildRootElements(rootX, rootY);
+                    setInitialData({ elements });
+                    lastElementsRef.current = elements;
                 }
             })
-            .catch(err => console.error("Initial fetch error:", err));
-    }, [meetingId]);
+            .catch(async (err) => {
+                console.error("Initial fetch error:", err);
+                const elements = await buildRootElements(500, 300);
+                setInitialData({ elements });
+                lastElementsRef.current = elements;
+            });
+    }, [meetingId, buildRootElements]);
 
     // Handle incoming real-time data
     const handleRemoteChange = useCallback((msg: any) => {
@@ -193,9 +145,11 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         lastElementsRef.current = [...elements];
     }, [localParticipant, meetingId]);
 
-    const handleAddChild = () => {
+    const handleAddChild = async () => {
         if (!excalidrawAPI) return;
         
+        const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+
         const sceneElements = excalidrawAPI.getSceneElements() || [];
         const appState = excalidrawAPI.getAppState();
 
@@ -224,7 +178,6 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         
         const now = Date.now();
         const childId = `node-${now}`;
-        const textId = `text-${now}`;
         const arrowId = `arrow-${now}`;
         
         const childX = parent.x + parent.width + 120;
@@ -233,47 +186,41 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         const colors = ['#ff922b', '#74c0fc', '#63e6be', '#94d82d', '#ffd43b', '#ff8787', '#e599f7'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-        // Create child node with bound text and arrow binding
-        const { rect: childNode, text: textNode } = createNodeElements(
-            childId, textId,
-            childX, childY, 160, 50,
-            randomColor, "New Idea", 18,
-            [{ type: "arrow", id: arrowId }]
-        );
-
-        // Create arrow connecting parent to child
-        const arrowStartX = parent.x + parent.width;
-        const arrowStartY = parent.y + parent.height / 2;
-        const arrowEndX = childX;
-        const arrowEndY = childY + 25;
-
-        const arrow: any = {
-            type: "arrow",
-            id: arrowId,
-            x: arrowStartX,
-            y: arrowStartY,
-            width: arrowEndX - arrowStartX,
-            height: arrowEndY - arrowStartY,
-            strokeColor: "#adb5bd",
-            strokeWidth: 2,
-            strokeStyle: "solid",
-            fillStyle: "solid",
-            points: [[0, 0], [arrowEndX - arrowStartX, arrowEndY - arrowStartY]],
-            startBinding: { elementId: parent.id, focus: 0, gap: 5 },
-            endBinding: { elementId: childId, focus: 0, gap: 5 },
-            endArrowhead: "arrow",
-            startArrowhead: null,
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000),
-            groupIds: [],
-            boundElements: [],
-            locked: false,
-            link: null,
-            opacity: 100,
-            seed: Math.floor(Math.random() * 1000000),
-            isDeleted: false,
-            roundness: { type: 2 },
-        };
+        // Use convertToExcalidrawElements for proper element initialization
+        const newElements = convertToExcalidrawElements([
+            {
+                type: "rectangle",
+                id: childId,
+                x: childX,
+                y: childY,
+                width: 160,
+                height: 50,
+                backgroundColor: randomColor,
+                strokeColor: randomColor,
+                fillStyle: "solid",
+                roundness: { type: 3 },
+                strokeWidth: 2,
+                label: {
+                    text: "New Idea",
+                    fontSize: 18,
+                    strokeColor: "#ffffff",
+                },
+            },
+            {
+                type: "arrow",
+                id: arrowId,
+                x: parent.x + parent.width,
+                y: parent.y + parent.height / 2,
+                width: childX - (parent.x + parent.width),
+                height: (childY + 25) - (parent.y + parent.height / 2),
+                strokeColor: "#adb5bd",
+                strokeWidth: 2,
+                roundness: { type: 2 },
+                start: { id: parent.id },
+                end: { id: childId },
+                endArrowhead: "arrow",
+            },
+        ]);
 
         // Update parent's boundElements to include the new arrow
         const parentIndex = currentElements.findIndex((el: any) => el.id === parent.id);
@@ -291,7 +238,7 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         }
 
         excalidrawAPI.updateScene({ 
-            elements: [...currentElements, childNode, textNode, arrow],
+            elements: [...currentElements, ...newElements],
             appState: { selectedElementIds: { [childId]: true } }
         });
     };
@@ -300,6 +247,15 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
         if (!excalidrawAPI) return;
         excalidrawAPI.scrollToContent();
     };
+
+    // Don't render Excalidraw until initialData is ready
+    if (!initialData) {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-slate-800">
+                <div className="text-slate-400 text-sm">Loading mind map...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-full relative bg-slate-800 overflow-hidden">
