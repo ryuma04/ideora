@@ -299,7 +299,15 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             </div>
 
             {/* Canvas Engine */}
-            <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 z-0 hide-excalidraw-ui">
+                <style jsx global>{`
+                    .hide-excalidraw-ui .excalidraw .App-toolbar-container,
+                    .hide-excalidraw-ui .excalidraw .layer-ui__wrapper .Island:not(.App-toolbar),
+                    .hide-excalidraw-ui .excalidraw .App-menu,
+                    .hide-excalidraw-ui .excalidraw .welcome-screen {
+                        display: none !important;
+                    }
+                `}</style>
                 <Excalidraw
                     excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
                     initialData={initialData}
