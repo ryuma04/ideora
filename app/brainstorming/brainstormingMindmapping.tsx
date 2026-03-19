@@ -50,7 +50,15 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                         fillStyle: "solid",
                         roundness: { type: 3 },
                         version: 1,
-                        versionNonce: 12345
+                        versionNonce: 12345,
+                        groupIds: [],
+                        boundElements: [],
+                        locked: false,
+                        link: null,
+                        opacity: 100,
+                        strokeWidth: 2,
+                        strokeStyle: "solid",
+                        seed: 123
                     };
                     const rootText: any = {
                         type: "text",
@@ -64,7 +72,13 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
                         verticalAlign: "middle",
                         strokeColor: "#ffffff",
                         version: 1,
-                        versionNonce: 54321
+                        versionNonce: 54321,
+                        groupIds: [],
+                        boundElements: [],
+                        locked: false,
+                        link: null,
+                        opacity: 100,
+                        seed: 456
                     };
                     setInitialData({ elements: [rootNode, rootText] });
                     lastElementsRef.current = [rootNode, rootText];
@@ -176,7 +190,15 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             fillStyle: "solid",
             roundness: { type: 3 },
             version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000)
+            versionNonce: Math.floor(Math.random() * 1000000),
+            groupIds: [],
+            boundElements: [{ type: "arrow", id: arrowId }], // Text and Arrow will bind
+            locked: false,
+            link: null,
+            opacity: 100,
+            strokeWidth: 2,
+            strokeStyle: "solid",
+            seed: Math.floor(Math.random() * 1000000)
         };
 
         const textId = `text-${Date.now()}`;
@@ -193,7 +215,13 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             strokeColor: "#ffffff",
             backgroundColor: "transparent",
             version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000)
+            versionNonce: Math.floor(Math.random() * 1000000),
+            groupIds: [],
+            boundElements: [],
+            locked: false,
+            link: null,
+            opacity: 100,
+            seed: Math.floor(Math.random() * 1000000)
         };
 
         const arrow: any = {
@@ -210,7 +238,13 @@ export default function BrainstormingMindmapping({ meetingId }: MindmapProps) {
             startBinding: { elementId: parent.id, focus: 0.5, gap: 1 },
             endBinding: { elementId: childId, focus: 0.5, gap: 1 },
             version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000)
+            versionNonce: Math.floor(Math.random() * 1000000),
+            groupIds: [],
+            boundElements: [],
+            locked: false,
+            link: null,
+            opacity: 100,
+            seed: Math.floor(Math.random() * 1000000)
         };
 
         excalidrawAPI.updateScene({ 
