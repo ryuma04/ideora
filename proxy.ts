@@ -20,10 +20,12 @@ export function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL("/auth/login", request.url));
     }
 
-    // Redirect authenticated users trying to access auth routes (login/signup)
-    if (isPublicPath && token) {
-        // Only redirect if trying to access actual login/signup/forgot-password pages, 
-        // not necessarily logout or verification if handled via GET
+    // Redirect authenticated users trying to access login/signup pages
+    // But allow verifyEmail, resetPassword, forgotPassword even when logged in
+    const authExemptPaths = ['/auth/verifyEmail', '/auth/resetPassword', '/auth/forgotPassword'];
+    const isAuthExempt = authExemptPaths.some(p => path.startsWith(p));
+    
+    if (isPublicPath && token && !isAuthExempt) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     
