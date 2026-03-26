@@ -1,247 +1,251 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Tldraw, Editor, createShapeId, getSnapshot, loadSnapshot } from "tldraw";
-import "tldraw/tldraw.css";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import ReactFlow, {
+    Background, Controls, MiniMap,
+    useNodesState, useEdgesState, addEdge,
+    Connection, Edge, Node, BackgroundVariant,
+    useReactFlow, ReactFlowProvider
+} from "reactflow";
+import "reactflow/dist/style.css";
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+import StickyNoteNode from "./StickyNoteNode";
+
+const STICKY_COLORS = [
+    { name: 'yellow', hex: 'bg-[#fde047]', border: 'border-[#eab308]' },
+    { name: 'green', hex: 'bg-[#86efac]', border: 'border-[#4ade80]' },
+    { name: 'blue', hex: 'bg-[#93c5fd]', border: 'border-[#60a5fa]' },
+    { name: 'violet', hex: 'bg-[#d8b4fe]', border: 'border-[#c084fc]' },
+    { name: 'red', hex: 'bg-[#fca5a5]', border: 'border-[#f87171]' }
+];
 
 interface StickyNotesProps {
     meetingId: string;
+    readOnly?: boolean;
 }
 
-export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps) {
-    const [editor, setEditor] = useState<Editor | null>(null);
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const { localParticipant } = useLocalParticipant();
+function StickyNotesContent({ meetingId, readOnly = false }: StickyNotesProps) {
+    const nodeTypes = useMemo(() => ({
+        sticky: StickyNoteNode,
+    }), []);
 
-    const handleMount = useCallback((editor: Editor) => {
-        setEditor(editor);
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const { fitView } = useReactFlow();
+
+    const handleNodeChange = useCallback((id: string, newLabel: string) => {
+        if (readOnly) return;
+        setNodes((nds) =>
+            nds.map((node) => {
+                if (node.id === id) {
+                    return { ...node, data: { ...node.data, label: newLabel } };
+                }
+                return node;
+            })
+        );
+    }, [setNodes, readOnly]);
+
+    const addStickyNote = useCallback((colorObj: any) => {
+        if (readOnly) return;
+        const newNodeId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Match the application's overall dark theme for the canvas background
-        editor.user.updateUserPreferences({ colorScheme: 'dark' });
+        const randomOffsetX = (Math.random() - 0.5) * 80;
+        const randomOffsetY = (Math.random() - 0.5) * 80;
 
-        // Fetch initial state
+        const newNode: Node = {
+            id: newNodeId,
+            type: 'sticky',
+            position: { x: 400 + randomOffsetX, y: 300 + randomOffsetY },
+            data: { 
+                label: '', 
+                color: colorObj.hex, 
+                borderColor: colorObj.border,
+                onChange: handleNodeChange 
+            },
+        };
+
+        setNodes((nds) => [...nds, newNode]);
+    }, [setNodes, handleNodeChange, readOnly]);
+
+    useEffect(() => {
         fetch(`/api/brainstorming/stickyNotes?meetingId=${meetingId}`)
             .then(res => res.json())
             .then(data => {
-                if (data.state) {
-                    try {
-                        const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-                        if (parsedState.store) {    
-                            const records = Object.values(parsedState.store) as any[];
-                            if(records.length > 0) {
-                                loadSnapshot(editor.store, parsedState);
-                            }
-                        } else {
-                           loadSnapshot(editor.store, parsedState);
-                        }
-                    } catch (e) {
-                         console.error("Failed to load sticky notes state", e);
-                    }
+                if (data.state && Array.isArray(data.state.nodes) && Array.isArray(data.state.edges)) {
+                    const loadedNodes = data.state.nodes.map((n: Node) => ({
+                        ...n,
+                        data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                    }));
+                    setNodes(loadedNodes);
+                    setEdges(data.state.edges);
                 }
-                // Center on existing shapes if there are any
-                requestAnimationFrame(() => {
-                    const shapes = editor.getCurrentPageShapes();
-                    if (shapes.length > 0) {
-                        editor.zoomToFit();
-                    }
-                });
+                setIsLoaded(true);
             })
-            .catch(err => console.error("Initial fetch error:", err));
-    }, [meetingId]);
-
-    // Handle incoming real-time cursor/drawing data from other users
-    const handleRemoteChange = useCallback((msg: any) => {
-        if (!editor || !msg.payload) return;
-        
-        try {
-            const payloadStr = new TextDecoder().decode(msg.payload);
-            const changes = JSON.parse(payloadStr);
-
-            editor.store.mergeRemoteChanges(() => {
-                const added = Object.values(changes.added || {});
-                const updated = Object.values(changes.updated || {}).map((u: any) => u[1]); // u[0] is old, u[1] is new
-                const removed = Object.keys(changes.removed || {});
-                
-                if (added.length > 0) editor.store.put(added as any);
-                if (updated.length > 0) editor.store.put(updated as any);
-                if (removed.length > 0) editor.store.remove(removed as any);
+            .catch(err => {
+                console.error("Initial fetch error:", err);
+                setIsLoaded(true);
             });
-        } catch (err) {
-            console.error("Failed to parse incoming sticky notes update", err);
-        }
-    }, [editor]);
+    }, [meetingId, handleNodeChange, setNodes, setEdges, readOnly]);
 
-    useDataChannel('sticky-notes-update', handleRemoteChange);
-
-    // Setup listener for changes
     useEffect(() => {
-        if (!editor || !meetingId || !localParticipant) return;
+        if (isLoaded && readOnly) {
+            setTimeout(() => {
+                fitView({ padding: 0.2, duration: 800 });
+            }, 100);
+        }
+    }, [isLoaded, readOnly, fitView, nodes.length]);
 
-        const unsubscribe = editor.store.listen(
-            (update) => {
-                if(Object.keys(update.changes.added).length === 0 &&
-                   Object.keys(update.changes.updated).length === 0 &&
-                   Object.keys(update.changes.removed).length === 0 ) {
-                     return;
-                }
+    const onConnect = useCallback((params: Edge | Connection) => {
+        setEdges((eds) => addEdge({...params, animated: false, style: { stroke: '#94a3b8', strokeWidth: 3, strokeDasharray: '5,5' } }, eds));
+    }, [setEdges]);
 
-                try {
-                    const payloadBytes = new TextEncoder().encode(JSON.stringify(update.changes));
-                    localParticipant.publishData(payloadBytes, { topic: 'sticky-notes-update' }).catch((e: any) => {
-                         console.error("Failed to broadcast sticky notes update via LiveKit (Connection might be closed)", e);
-                    });
-                } catch (e) {
-                    console.error("Failed to encode sticky notes update", e);
-                }
+    if (!isLoaded) return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white">Loading Notes...</div>;
 
-                if (saveTimeoutRef.current) {
-                    clearTimeout(saveTimeoutRef.current);
-                }
-
-                saveTimeoutRef.current = setTimeout(async () => {
-                    const snapshot = getSnapshot(editor.store);
-                    try {
-                        await fetch('/api/brainstorming/stickyNotes', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                meetingId,
-                                state: snapshot
-                            })
-                        });
-                    } catch (err) {
-                        console.error("Failed to sync sticky notes to backend", err);
-                    }
-                }, 1000);
-            },
-            { scope: 'document', source: 'user' }
-        );
-
-        return () => {
-            unsubscribe();
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, [editor, meetingId, localParticipant]);
-
-    const addStickyNote = (color: string) => {
-        if (!editor) return;
-
-        const noteId = createShapeId();
-        
-        // Calculate the center of the current viewport to spawn the note
-        const viewportCenter = editor.getViewportPageBounds().center;
-        
-        // Add a slight random offset so multiple clicks don't stack perfectly hiding each other
-        const randomOffsetX = (Math.random() - 0.5) * 50;
-        const randomOffsetY = (Math.random() - 0.5) * 50;
-
-        editor.createShape({
-            id: noteId,
-            type: 'note',
-            x: viewportCenter.x + randomOffsetX - 100, // Offset by half the width of a standard note approx
-            y: viewportCenter.y + randomOffsetY - 100,
-            props: {
-                color: color as any, // 'yellow', 'blue', 'green', 'light-violet', etc.
-                size: 'm',
-            },
-        });
-
-        // Select the newly created note and jump into editing mode
-        editor.select(noteId);
-        setTimeout(() => {
-            try { editor.setEditingShape(noteId); } catch(e) {}
-        }, 50);
+    const getNodeColor = (node: Node) => {
+        if (node.data?.color && typeof node.data.color === 'string') {
+            return node.data.color.replace('bg-[', '').replace(']', '');
+        }
+        return '#fde047';
     };
-
-    const handleRecenter = () => {
-        if (!editor) return;
-        editor.zoomToFit({ animation: { duration: 300 } });
-    };
-
-    // Beautiful curated colors corresponding to tldraw's native palette colors
-    const colors = [
-        { name: 'yellow', hex: 'bg-[#ffc034]', border: 'border-[#ffae00]' },
-        { name: 'green', hex: 'bg-[#40c057]', border: 'border-[#37a44b]' },
-        { name: 'light-blue', hex: 'bg-[#4dabf7]', border: 'border-[#2793ec]' },
-        { name: 'light-violet', hex: 'bg-[#e599f7]', border: 'border-[#dc71f4]' },
-        { name: 'light-red', hex: 'bg-[#ff8787]', border: 'border-[#ff6666]' }
-    ];
 
     return (
-        <div className="w-full h-full relative bg-slate-800 overflow-hidden">
-            
-            {/* Custom Control Palette Overlay */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-3 bg-slate-800/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-700 shadow-2xl">
-                
-                {/* Tools */}
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 mt-1 text-center leading-tight">
-                    Tools
-                </p>
-                <div className="flex flex-col gap-2">
-                    <button
-                        onClick={() => editor?.setCurrentTool('select')}
-                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
-                        title="Select Tool"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
-                    </button>
-                    
-                    <button
-                        onClick={() => editor?.setCurrentTool('arrow')}
-                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
-                        title="Draw Arrow"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                    </button>
+        <div className="w-full h-full min-h-[500px] relative bg-slate-800 overflow-hidden text-slate-900">
+            {!readOnly && (
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-4 bg-slate-800/95 backdrop-blur-xl p-4 rounded-[24px] border border-slate-700 shadow-2xl">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">
+                        Add<br/>Note
+                    </p>
+                    {STICKY_COLORS.map((colorObj) => (
+                        <button
+                            key={colorObj.name}
+                            onClick={() => addStickyNote(colorObj)}
+                            className={`w-12 h-12 rounded-xl border-t-[6px] ${colorObj.hex} ${colorObj.border} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 opacity-90 hover:opacity-100 flex items-center justify-center group`}
+                            title={`Add ${colorObj.name} note`}
+                        >
+                            <svg className="w-6 h-6 text-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                    ))}
                 </div>
+            )}
 
-                <div className="w-full h-px bg-slate-600/50 my-1"></div>
+            <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={readOnly ? undefined : onNodesChange}
+                onEdgesChange={readOnly ? undefined : onEdgesChange}
+                onConnect={readOnly ? undefined : onConnect}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.2 }}
+                className="bg-slate-800"
+                nodesDraggable={!readOnly}
+                nodesConnectable={!readOnly}
+                elementsSelectable={!readOnly}
+            >
+                <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" />
+                <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />
+                <MiniMap 
+                    nodeStrokeColor={(n) => '#94a3b8'}
+                    nodeColor={getNodeColor}
+                    maskColor="rgba(0, 0, 0, 0.4)"
+                    className="bg-slate-700"
+                />
+            </ReactFlow>
 
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">
-                    New<br/>Note
-                </p>
-                {colors.map((colorObj) => (
-                    <button
-                        key={colorObj.name}
-                        onClick={() => addStickyNote(colorObj.name)}
-                        className={`w-10 h-10 rounded-xl ${colorObj.hex} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 border-2 ${colorObj.border} opacity-90 hover:opacity-100 flex items-center justify-center group`}
-                        title={`Add ${colorObj.name} sticky note`}
-                    >
-                        <svg className="w-5 h-5 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                ))}
-            </div>
-
-            {/* Focus Map Button */}
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button
-                    onClick={handleRecenter}
-                    className="flex items-center gap-2 px-3 py-2 bg-slate-800 backdrop-blur-md hover:bg-slate-700 text-white border border-slate-700 rounded-lg shadow-xl transition-colors text-sm font-medium"
-                    title="Center View"
-                >
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" /></svg>
-                    Focus View
-                </button>
-            </div>
-            
-            {/* Instructions Overlay */}
-            <div className="absolute bottom-4 left-4 z-10 bg-slate-800/90 backdrop-blur-xl px-4 py-3 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl ml-16">
-                <p className="font-bold text-white mb-2 flex items-center gap-1.5 text-sm border-b border-slate-700 pb-1.5">
-                   <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                   Sticky Notes Wall
-                </p>
-                <div className="space-y-1">
-                    <p>• <span className="text-emerald-400 font-medium">Click a color</span> to drop a note</p>
-                    <p>• <span className="text-white font-medium">Drag</span> the background to pan</p>
-                    <p>• <span className="text-white font-medium">Draw arrows</span> from edges to connect</p>
+             {!readOnly && (
+                 <div className="absolute bottom-6 left-28 z-10 bg-slate-800/90 backdrop-blur-xl px-5 py-4 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl">
+                    <p className="font-bold text-white mb-2 flex items-center gap-2 text-sm border-b border-slate-700 pb-2">
+                       <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                       Sticky Notes Wall
+                    </p>
+                    <div className="space-y-1.5 text-[13px]">
+                        <p>• <span className="text-emerald-400 font-medium">Click a color</span> to drop a note</p>
+                        <p>• <span className="text-white font-medium">Drag from edges</span> to connect strings between notes</p>
+                    </div>
                 </div>
-            </div>
+             )}
 
-            {/* Canvas Engine */}
-            <div className="absolute inset-0 z-0">
-                <Tldraw hideUi onMount={handleMount} />
-            </div>
+            {!readOnly && (
+                <StickyNotesLiveKitSync 
+                    nodes={nodes} 
+                    edges={edges} 
+                    meetingId={meetingId} 
+                    isLoaded={isLoaded}
+                    onRemoteUpdate={(incoming) => {
+                        const restoredNodes = incoming.nodes.map((n: any) => ({
+                            ...n,
+                            data: { ...n.data, onChange: handleNodeChange }
+                        }));
+                        setNodes(restoredNodes);
+                        setEdges(incoming.edges);
+                    }}
+                />
+            )}
         </div>
     );
+}
+
+export default function BrainstormingStickyNotes(props: StickyNotesProps) {
+    return (
+        <ReactFlowProvider>
+            <StickyNotesContent {...props} />
+        </ReactFlowProvider>
+    );
+}
+
+interface SyncProps {
+    nodes: Node[];
+    edges: Edge[];
+    meetingId: string;
+    isLoaded: boolean;
+    onRemoteUpdate: (state: any) => void;
+}
+
+function StickyNotesLiveKitSync({ nodes, edges, meetingId, isLoaded, onRemoteUpdate }: SyncProps) {
+    const { localParticipant } = useLocalParticipant();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        if (!isLoaded || !localParticipant) return;
+        
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(async () => {
+            const cleanNodes = nodes.map(n => ({...n, data: { ...n.data, onChange: undefined }}));
+            const stateToSave = { nodes: cleanNodes, edges };
+            
+            try {
+                const payloadStr = JSON.stringify(stateToSave);
+                const payloadBytes = new TextEncoder().encode(payloadStr);
+                localParticipant.publishData(payloadBytes, { topic: 'stickynotes-reactflow' }).catch(() => {});
+            } catch (e) {}
+
+            try {
+                await fetch('/api/brainstorming/stickyNotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, state: stateToSave })
+                });
+            } catch (err) {}
+        }, 1000);
+
+        return () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        };
+    }, [nodes, edges, meetingId, localParticipant, isLoaded]);
+
+    useDataChannel('stickynotes-reactflow', (msg) => {
+        try {
+            const payloadStr = new TextDecoder().decode(msg.payload);
+            const incomingState = JSON.parse(payloadStr);
+            if (incomingState.nodes && incomingState.edges) {
+                onRemoteUpdate(incomingState);
+            }
+        } catch (err) {}
+    });
+
+    return null;
 }

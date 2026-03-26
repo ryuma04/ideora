@@ -65,6 +65,10 @@ export default function Dashboard() {
             try {
                 // Fetch profile
                 const res = await fetch('/api/dashboard/profile');
+                if (res.status === 401) {
+                    router.push('/auth/login');
+                    return;
+                }
                 const data = await res.json();
                 if (data.data) {
                     setUser({
@@ -74,6 +78,7 @@ export default function Dashboard() {
                 }
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
+                router.push('/auth/login');
             }
         };
         getUserDetails();

@@ -8,6 +8,7 @@ export function proxy(request: NextRequest) {
     const isProtectedPath = path.startsWith('/dashboard') || path.startsWith('/meeting');
 
     const token = request.cookies.get("token")?.value;
+    console.log(`proxy.ts: Path=${path}, Token Present=${!!token}`);
 
     // Redirect unauthenticated users trying to access protected routes
     if (isProtectedPath && !token) {
@@ -15,11 +16,12 @@ export function proxy(request: NextRequest) {
     }
 
     // Redirect authenticated users trying to access auth routes (login/signup)
+    // Removed to prevent redirect loops when token is expired but still present in cookies
+    /*
     if (isPublicPath && token) {
-        // Only redirect if trying to access actual login/signup/forgot-password pages, 
-        // not necessarily logout or verification if handled via GET
         return NextResponse.redirect(new URL("/dashboard", request.url));
     }
+    */
     
     return NextResponse.next();
 }

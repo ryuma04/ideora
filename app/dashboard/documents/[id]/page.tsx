@@ -8,6 +8,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 
 const Tldraw = dynamic(() => import('tldraw').then((mod) => mod.Tldraw), { ssr: false });
+const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brainstormingMindmapping'), { ssr: false });
+const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brainstormingStickyNotes'), { ssr: false });
 
 export default function MeetingDocumentViewer() {
     const router = useRouter();
@@ -171,7 +173,7 @@ export default function MeetingDocumentViewer() {
                     pdf.setTextColor(199, 210, 254);
                     pdf.text(title, pageWidth - 10, 9, { align: 'right' });
 
-                    if (tab !== 'swot' && editorRef.current) {
+                    if (tab === 'canvas' && editorRef.current) {
                         try {
                             const editor = editorRef.current;
                             const shapeIds = Array.from(editor.getCurrentPageShapeIds());
@@ -191,25 +193,21 @@ export default function MeetingDocumentViewer() {
                                 throw new Error('toImage returned empty blob');
                             }
 
-                            // Convert Blob to Data URL
                             imgData = await new Promise((resolve) => {
                                 const reader = new FileReader();
                                 reader.onloadend = () => resolve(reader.result as string);
                                 reader.readAsDataURL(imageResult.blob);
                             });
 
-                            const contentTop = 18; // mm from top
-                            const availableWidth = pageWidth - 20; // 10mm margins
-                            const availableHeight = pageHeight - contentTop - 10;
                             const imgAspect = imageResult.width / imageResult.height;
-                            const slotAspect = availableWidth / availableHeight;
+                            const slotAspect = (pageWidth - 20) / (pageHeight - 28);
 
                             if (imgAspect > slotAspect) {
-                                imgW = availableWidth;
-                                imgH = availableWidth / imgAspect;
+                                imgW = pageWidth - 20;
+                                imgH = (pageWidth - 20) / imgAspect;
                             } else {
-                                imgH = availableHeight;
-                                imgW = availableHeight * imgAspect;
+                                imgH = pageHeight - 28;
+                                imgW = (pageHeight - 28) * imgAspect;
                             }
 
                         } catch (err) {
@@ -217,36 +215,61 @@ export default function MeetingDocumentViewer() {
                             continue;
                         }
                     } else {
-                        // Fallback to html2canvas for swot table
-                        const canvas = await html2canvas(element, {
-                            scale: 3,
-                            useCORS: true,
-                            allowTaint: true,
-                            backgroundColor: '#f8fafc',
-                            logging: false
-                        });
-                        imgData = canvas.toDataURL('image/jpeg', 0.8);
+                        try {
+                             // Give React Flow a bit more time to settle and fitView to finish
+                            await new Promise(resolve => setTimeout(resolve, tab === 'swot' ? 500 : 2000));
+                            
+                            const canvas = await html2canvas(element, {
+                                scale: 2,
+                                useCORS: true,
+                                allowTaint: true,
+                                backgroundColor: tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc',
+                                logging: false,
+                                windowWidth: 1200,
+                                windowHeight: 800,
+                                onclone: (clonedDoc) => {
+                                    // Hide unnecessary UI elements in the PDF
+                                    const selectors = [
+                                        '.react-flow__controls',
+                                        '.react-flow__minimap',
+                                        'button', // Hide any floating action buttons
+                                        '.absolute.bottom-4.left-4', // Hide instructions
+                                        '.absolute.bottom-6.left-28' // Hide Sticky instructions
+                                    ];
+                                    selectors.forEach(s => {
+                                        const el = clonedDoc.querySelector(s);
+                                        if (el) (el as HTMLElement).style.display = 'none';
+                                    });
 
-                        const contentTop = 18;
-                        const availableWidth = pageWidth - 20;
-                        const availableHeight = pageHeight - contentTop - 10;
-                        const imgAspect = canvas.width / canvas.height;
-                        const slotAspect = availableWidth / availableHeight;
+                                    // Ensure the background is captured correctly
+                                    const rf = clonedDoc.querySelector('.react-flow');
+                                    if (rf) (rf as HTMLElement).style.backgroundColor = tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc';
+                                }
+                            });
+                            
+                            imgData = canvas.toDataURL('image/jpeg', 0.9);
+                            const imgAspect = canvas.width / canvas.height;
+                            const slotAspect = (pageWidth - 20) / (pageHeight - 28);
 
-                        if (imgAspect > slotAspect) {
-                            imgW = availableWidth;
-                            imgH = availableWidth / imgAspect;
-                        } else {
-                            imgH = availableHeight;
-                            imgW = availableHeight * imgAspect;
+                            if (imgAspect > slotAspect) {
+                                imgW = pageWidth - 20;
+                                imgH = (pageWidth - 20) / imgAspect;
+                            } else {
+                                imgH = pageHeight - 28;
+                                imgW = (pageHeight - 28) * imgAspect;
+                            }
+                        } catch (err) {
+                            console.error(`html2canvas failed for ${tab}`, err);
+                            continue;
                         }
                     }
 
-                    const marginContentTop = 18;
-                    const imgX = (pageWidth - imgW) / 2;
-                    const imgY = marginContentTop + ((pageHeight - marginContentTop - 10) - imgH) / 2;
-
-                    pdf.addImage(imgData, imgData.startsWith('data:image/png') ? 'PNG' : 'JPEG', imgX, imgY, imgW, imgH, undefined, 'FAST');
+                    if (imgData) {
+                        const imgX = (pageWidth - imgW) / 2;
+                        const imgY = 18 + ((pageHeight - 28) - imgH) / 2;
+                        
+                        pdf.addImage(imgData, imgData.startsWith('data:image/png') ? 'PNG' : 'JPEG', imgX, imgY, imgW, imgH, undefined, 'FAST');
+                    }
 
                     // Footer
                     pdf.setFontSize(8);
@@ -509,10 +532,18 @@ export default function MeetingDocumentViewer() {
                 </div>
 
                 {/* Content area captured for PDF export */}
-                <div ref={contentRef}>
+                <div ref={contentRef} className="flex-1">
                     {activeTab === 'canvas' && renderTldrawBoard('canvas')}
-                    {activeTab === 'mindmap' && renderTldrawBoard('mindmap')}
-                    {activeTab === 'stickyNotes' && renderTldrawBoard('stickyNotes')}
+                    {activeTab === 'mindmap' && (
+                        <div className="w-full h-[700px] relative rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-900">
+                            <BrainstormingMindmapping meetingId={meetingId || ""} readOnly={true} />
+                        </div>
+                    )}
+                    {activeTab === 'stickyNotes' && (
+                        <div className="w-full h-[700px] relative rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-800">
+                             <BrainstormingStickyNotes meetingId={meetingId || ""} readOnly={true} />
+                        </div>
+                    )}
                     {activeTab === 'swot' && renderSwot()}
                 </div>
             </main>
