@@ -136,9 +136,30 @@ export default function MOMHistory() {
                                     </p>
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-sm font-medium text-indigo-600">
-                                    <span>Download/View MoM</span>
-                                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDownload(mom.momUrl, mom.title);
+                                        }}
+                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group/btn"
+                                    >
+                                        <span>Download</span>
+                                        <svg className="w-4 h-4 group-hover/btn:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    </button>
+
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const safeTitle = mom.title.replace(/\s+/g, '_');
+                                            const viewUrl = `/api/dashboard/mom/download?url=${encodeURIComponent(mom.momUrl)}&filename=${encodeURIComponent(safeTitle)}&mode=inline`;
+                                            window.open(viewUrl, '_blank');
+                                        }}
+                                        className="text-sm font-medium text-slate-600 hover:text-indigo-600 flex items-center gap-1 group/view"
+                                    >
+                                        <span>View in Browser</span>
+                                        <svg className="w-4 h-4 group-hover/view:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                    </button>
                                 </div>
                             </div>
                         ))
