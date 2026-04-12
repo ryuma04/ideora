@@ -107,7 +107,7 @@ export default function MOMHistory() {
                         moms.map((mom: any) => (
                             <div
                                 key={mom._id}
-                                onClick={() => handleDownload(mom.momUrl, mom.title)}
+                                onClick={() => router.push(`/dashboard/mom/${mom._id}`)}
                                 className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-xl hover:border-indigo-400 hover:-translate-y-1 transition-all cursor-pointer group flex flex-col h-full"
                             >
                                 <div className="flex items-center justify-between mb-4">
@@ -149,12 +149,6 @@ export default function MOMHistory() {
                                     </button>
 
                                     <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const safeTitle = mom.title.replace(/\s+/g, '_');
-                                            const viewUrl = `/api/dashboard/mom/download?url=${encodeURIComponent(mom.momUrl)}&filename=${encodeURIComponent(safeTitle)}&mode=inline`;
-                                            window.open(viewUrl, '_blank');
-                                        }}
                                         className="text-sm font-medium text-slate-600 hover:text-indigo-600 flex items-center gap-1 group/view"
                                     >
                                         <span>View in Browser</span>
