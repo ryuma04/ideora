@@ -1,8 +1,8 @@
 "use client";
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
 
-// Define the quadrants
 type SWOTQuadrant = 'strengths' | 'weaknesses' | 'opportunities' | 'threats';
 
 interface SWOTState {
@@ -14,18 +14,18 @@ interface SWOTState {
 
 interface SWOTProps {
     meetingId: string;
+    readOnly?: boolean;
+    initialData?: SWOTState;
 }
 
-export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
-    const { localParticipant } = useLocalParticipant();
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    const [swotData, setSwotData] = useState<SWOTState>({
+export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false, initialData }: SWOTProps) {
+    const [swotData, setSwotData] = useState<SWOTState>(initialData || {
         strengths: ["Great team", "Strong tech stack"],
         weaknesses: [],
         opportunities: [],
-        threats: []
+        threats: [],
     });
+    const [isLoaded, setIsLoaded] = useState(false);
 
     const [inputs, setInputs] = useState({
         strengths: '',
@@ -34,62 +34,37 @@ export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
         threats: ''
     });
 
-    // 1. Fetch initial state on mount
+    // Initial DB Fetch
     useEffect(() => {
+        if (initialData) {
+            try {
+                const parsed = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
+                setSwotData(parsed);
+            } catch (e) {
+                console.error("Failed to parse SWOT Data:", e);
+            }
+            setIsLoaded(true);
+            return;
+        }
+
         if (!meetingId) return;
         fetch(`/api/brainstorming/swotAnalysis?meetingId=${meetingId}`)
             .then(res => res.json())
             .then(data => {
-                if (data.state) {
-                     setSwotData(typeof data.state === 'string' ? JSON.parse(data.state) : data.state);
+                if (data.state && Object.keys(data.state).length > 0) {
+                    setSwotData(typeof data.state === 'string' ? JSON.parse(data.state) : data.state);
                 }
+                setIsLoaded(true);
             })
-            .catch(err => console.error("Initial SWOT fetch error:", err));
-    }, [meetingId]);
-
-    // 2. Define the broadcast function that syncs to LiveKit + DB
-    const broadcastSwotUpdate = useCallback((newState: SWOTState) => {
-        if (!localParticipant || !meetingId) return;
-        
-        // Sync to LiveKit
-        try {
-            const payloadBytes = new TextEncoder().encode(JSON.stringify(newState));
-            localParticipant.publishData(payloadBytes, { topic: 'swot-update' }).catch((e: any) => {
-                 console.error("Failed to broadcast SWOT update via LiveKit (Connection closed)", e);
+            .catch(err => {
+                console.error("Initial fetch error:", err);
+                setIsLoaded(true);
             });
-        } catch (e) {
-            console.error("Failed to encode SWOT update", e);
-        }
-
-        // Sync to Redis/DB (Debounced)
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(async () => {
-            try {
-                await fetch('/api/brainstorming/swotAnalysis', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, state: newState })
-                });
-            } catch (err) {
-                console.error("Failed to sync SWOT to backend", err);
-            }
-        }, 1000);
-    }, [localParticipant, meetingId]);
-
-    // 3. Listen for remote updates and merge them instantly
-    useDataChannel('swot-update', useCallback((msg: any) => {
-        if (!msg.payload) return;
-        try {
-            const payloadStr = new TextDecoder().decode(msg.payload);
-            const newState = JSON.parse(payloadStr);
-            setSwotData(newState); // Immediately overwrite local state with the exact network state
-        } catch(e) {
-            console.error("Failed to parse incoming SWOT update", e);
-        }
-    }, []));
+    }, [meetingId, initialData]);
 
     const handleAddPoint = (quadrant: SWOTQuadrant, e: React.FormEvent) => {
         e.preventDefault();
+        if (readOnly) return;
         const value = inputs[quadrant].trim();
         if (!value) return;
 
@@ -98,7 +73,6 @@ export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
                 ...prev,
                 [quadrant]: [...prev[quadrant], value]
             };
-            broadcastSwotUpdate(newState);
             return newState;
         });
 
@@ -106,12 +80,12 @@ export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
     };
 
     const handleRemovePoint = (quadrant: SWOTQuadrant, index: number) => {
+        if (readOnly) return;
         setSwotData(prev => {
             const newState = {
                 ...prev,
                 [quadrant]: prev[quadrant].filter((_, i) => i !== index)
             };
-            broadcastSwotUpdate(newState);
             return newState;
         });
     };
@@ -159,15 +133,17 @@ export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
                                 ) : (
                                     <ul className="space-y-2">
                                         {swotData[quadrant].map((point, idx) => (
-                                            <li key={idx} className="group flex items-start gap-2 text-sm text-slate-300 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                            <li key={idx} className="group flex items-start gap-2 text-sm text-slate-300">
                                                 <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${config.bulletColor}`} />
                                                 <span className="flex-1 leading-relaxed">{point}</span>
-                                                <button
-                                                    onClick={() => handleRemovePoint(quadrant, idx)}
-                                                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity p-1"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                </button>
+                                                {!readOnly && (
+                                                    <button
+                                                        onClick={() => handleRemovePoint(quadrant, idx)}
+                                                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity p-1"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>
@@ -175,28 +151,88 @@ export default function BrainstormingSwotAnalysis({ meetingId }: SWOTProps) {
                             </div>
 
                             {/* Input Area */}
-                            <form onSubmit={(e) => handleAddPoint(quadrant, e)} className="p-2 border-t border-slate-700/50 bg-slate-800/50">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={inputs[quadrant]}
-                                        onChange={(e) => setInputs(prev => ({ ...prev, [quadrant]: e.target.value }))}
-                                        placeholder={`Add a point...`}
-                                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-500 transition-colors"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!inputs[quadrant].trim()}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${config.lightColor} ${config.color} hover:opacity-80`}
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                    </button>
-                                </div>
-                            </form>
+                            {!readOnly && (
+                                <form onSubmit={(e) => handleAddPoint(quadrant, e)} className="p-2 border-t border-slate-700/50 bg-slate-800/50">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={inputs[quadrant]}
+                                            onChange={(e) => setInputs(prev => ({ ...prev, [quadrant]: e.target.value }))}
+                                            placeholder={`Add a point...`}
+                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-500 transition-colors"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!inputs[quadrant].trim()}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${config.lightColor} ${config.color} hover:opacity-80`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     );
                 })}
             </div>
+
+            {!readOnly && (
+                <SwotLiveKitSync 
+                    swotData={swotData} 
+                    meetingId={meetingId} 
+                    onRemoteUpdate={setSwotData}
+                />
+            )}
         </div>
     );
+}
+
+interface SyncProps {
+    swotData: SWOTState;
+    meetingId: string;
+    onRemoteUpdate: (state: SWOTState) => void;
+}
+
+function SwotLiveKitSync({ swotData, meetingId, onRemoteUpdate }: SyncProps) {
+    const { localParticipant } = useLocalParticipant();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Broadcast update
+    useEffect(() => {
+        if (!localParticipant || !meetingId) return;
+
+        // Sync to Redis/DB (Debounced)
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            // Sync to LiveKit
+            try {
+                const payloadBytes = new TextEncoder().encode(JSON.stringify(swotData));
+                localParticipant.publishData(payloadBytes, { topic: 'swot-update' }).catch(() => {});
+            } catch (e) {}
+
+            try {
+                await fetch('/api/brainstorming/swotAnalysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, state: swotData })
+                });
+            } catch (err) {}
+        }, 1000);
+
+        return () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        };
+    }, [swotData, localParticipant, meetingId]);
+
+    // Receive update
+    useDataChannel('swot-update', (msg) => {
+        if (!msg.payload) return;
+        try {
+            const payloadStr = new TextDecoder().decode(msg.payload);
+            const newState = JSON.parse(payloadStr);
+            onRemoteUpdate(newState);
+        } catch(e) {}
+    });
+
+    return null;
 }

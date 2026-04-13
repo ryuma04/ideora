@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
 
@@ -12,24 +12,45 @@ const Excalidraw = dynamic(
 
 interface CanvasProps {
     meetingId: string;
+    readOnly?: boolean;
+    initialData?: any;
 }
 
-export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
+export default function BrainstormingCanvas({ meetingId, readOnly = false, initialData: propInitialData }: CanvasProps) {
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const { localParticipant } = useLocalParticipant();
     const [initialData, setInitialData] = useState<any>({ elements: [] });
     const lastElementsRef = useRef<any[]>([]);
 
     // Fetch initial state
     useEffect(() => {
+        if (propInitialData) {
+            try {
+                const parsedState = typeof propInitialData === 'string' ? JSON.parse(propInitialData) : propInitialData;
+                if (excalidrawAPI) {
+                    excalidrawAPI.updateScene({ elements: parsedState.elements || [] });
+                } else {
+                    setInitialData({ elements: parsedState.elements || [] });
+                }
+                lastElementsRef.current = parsedState.elements || [];
+            } catch (e) {
+                 console.error("Failed to parse initial canvas state", e);
+            }
+            return;
+        }
+
+        if (!meetingId) return;
         fetch(`/api/brainstorming/canvas?meetingId=${meetingId}`)
             .then(res => res.json())
             .then(data => {
                 if (data.state) {
                     try {
                         const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-                        setInitialData(parsedState);
+                        // For Excalidraw, we might need to set scene instead of initialData if excalidrawAPI is ready
+                        if (excalidrawAPI) {
+                            excalidrawAPI.updateScene({ elements: parsedState.elements || [] });
+                        } else {
+                            setInitialData({ elements: parsedState.elements || [] });
+                        }
                         lastElementsRef.current = parsedState.elements || [];
                     } catch (e) {
                          console.error("Failed to parse initial canvas state", e);
@@ -37,17 +58,130 @@ export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
                 }
             })
             .catch(err => console.error("Initial fetch error:", err));
-    }, [meetingId]);
+    }, [meetingId, excalidrawAPI, propInitialData]);
 
-    // Handle incoming real-time data from other users
-    const handleRemoteChange = useCallback((msg: any) => {
-        if (!excalidrawAPI || !msg.payload) return;
+    const onChange = useCallback((elements: readonly any[], appState: any) => {
+        if (readOnly) return;
         
+        // Update local ref to track changes
+        lastElementsRef.current = [...elements];
+    }, [readOnly]);
+
+    return (
+        <div className="w-full h-full relative">
+            <Excalidraw
+                excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
+                initialData={initialData}
+                onChange={onChange}
+                theme="dark"
+                viewModeEnabled={readOnly}
+                UIOptions={{
+                    welcomeScreen: false,
+                    canvasActions: {
+                        toggleTheme: false,
+                        loadScene: false,
+                        export: false,
+                        saveAsImage: false,
+                    }
+                }}
+            />
+
+            {!readOnly && (
+                <CanvasLiveKitSync 
+                    excalidrawAPI={excalidrawAPI}
+                    meetingId={meetingId}
+                    lastElementsRef={lastElementsRef}
+                />
+            )}
+        </div>
+    );
+}
+
+interface SyncProps {
+    excalidrawAPI: any;
+    meetingId: string;
+    lastElementsRef: React.MutableRefObject<any[]>;
+}
+
+function CanvasLiveKitSync({ excalidrawAPI, meetingId, lastElementsRef }: SyncProps) {
+    const { localParticipant } = useLocalParticipant();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Broadcast Changes
+    useEffect(() => {
+        let hasSavedIntial = false;
+
+        const interval = setInterval(() => {
+            if (!excalidrawAPI || !localParticipant || !meetingId) return;
+            
+            const elements = excalidrawAPI.getSceneElements();
+            if (!elements) return;
+
+            // Initial generic save to ensure document is created even if user never draws
+            if (!hasSavedIntial && elements.length === 0) {
+                hasSavedIntial = true;
+                setTimeout(async () => {
+                    try {
+                        await fetch('/api/brainstorming/canvas', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                meetingId,
+                                action: 'save_to_db',
+                                state: { elements: [], appState: excalidrawAPI.getAppState() }
+                            })
+                        });
+                    } catch (err) {}
+                }, 2000);
+            }
+
+            // Simple diffing using versions
+            const changedElements = elements.filter((el: any) => {
+                const lastEl = lastElementsRef.current.find(le => le.id === el.id);
+                return !lastEl || lastEl.version > (lastEl?.version || 0); // Check if version is bumped
+            });
+
+            if (changedElements.length > 0) {
+                // Publish to LiveKit
+                try {
+                    const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
+                    localParticipant.publishData(payloadBytes, { topic: 'canvas-update' }).catch(() => {});
+                } catch (e) {}
+
+                // Sync to DB (debounced)
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = setTimeout(async () => {
+                    try {
+                        const allElements = excalidrawAPI.getSceneElements();
+                        await fetch('/api/brainstorming/canvas', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                meetingId,
+                                action: 'save_to_db',
+                                state: { elements: allElements, appState: excalidrawAPI.getAppState() }
+                            })
+                        });
+                    } catch (err) {}
+                }, 1500);
+
+                lastElementsRef.current = [...elements];
+            }
+        }, 1000); // Check for local changes every second
+
+        return () => {
+            clearInterval(interval);
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        };
+    }, [excalidrawAPI, localParticipant, meetingId]);
+
+    // Receive Changes
+    useDataChannel('canvas-update', (msg) => {
+        if (!excalidrawAPI || !msg.payload) return;
         try {
             const payloadStr = new TextDecoder().decode(msg.payload);
             const remoteElements = JSON.parse(payloadStr);
 
-            // Merge remote elements with local ones
             const currentElements = excalidrawAPI.getSceneElements() || [];
             const mergedElements = [...currentElements];
 
@@ -62,65 +196,8 @@ export default function BrainstormingCanvas({ meetingId }: CanvasProps) {
 
             excalidrawAPI.updateScene({ elements: mergedElements });
             lastElementsRef.current = mergedElements;
-        } catch (err) {
-            console.error("Failed to parse incoming canvas update", err);
-        }
-    }, [excalidrawAPI]);
+        } catch (err) {}
+    });
 
-    useDataChannel('canvas-update', handleRemoteChange);
-
-    const onChange = useCallback((elements: readonly any[], appState: any) => {
-        if (!localParticipant || !meetingId) return;
-
-        // Check if elements actually changed (ignoring versions for now to simplify, or use version comparison)
-        const changedElements = elements.filter(el => {
-            const lastRootEl = lastElementsRef.current.find(le => le.id === el.id);
-            return !lastRootEl || lastRootEl.version < el.version;
-        });
-
-        if (changedElements.length > 0) {
-            // 1. Broadcast changes to LiveKit
-            try {
-                const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
-                localParticipant.publishData(payloadBytes, { topic: 'canvas-update' }).catch((e: any) => {
-                     console.error("Failed to broadcast canvas update via LiveKit", e);
-                });
-            } catch (e) {
-                console.error("Failed to encode payload via LiveKit", e);
-            }
-
-            // 2. Debounce background save to Redis/MongoDB
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = setTimeout(async () => {
-                try {
-                    await fetch('/api/brainstorming/canvas', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            meetingId,
-                            state: { elements, appState }
-                        })
-                    });
-                } catch (err) {
-                    console.error("Failed to sync canvas to backend", err);
-                }
-            }, 1500);
-        }
-        
-        lastElementsRef.current = [...elements];
-    }, [localParticipant, meetingId]);
-
-    return (
-        <div className="w-full h-full relative">
-            <Excalidraw
-                excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
-                initialData={initialData}
-                onChange={onChange}
-                theme="dark"
-                UIOptions={{
-                    welcomeScreen: false
-                }}
-            />
-        </div>
-    );
-}
+    return null;
+}

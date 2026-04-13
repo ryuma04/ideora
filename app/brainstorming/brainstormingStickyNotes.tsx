@@ -1,302 +1,274 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import ReactFlow, {
+    Background, Controls, MiniMap,
+    useNodesState, useEdgesState, addEdge,
+    Connection, Edge, Node, BackgroundVariant,
+    useReactFlow, ReactFlowProvider
+} from "reactflow";
+import "reactflow/dist/style.css";
 import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+import StickyNoteNode from "./StickyNoteNode";
 
-// Excalidraw is client-side only
-const Excalidraw = dynamic(
-  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
-  { ssr: false }
-);
+const STICKY_COLORS = [
+    { name: 'yellow', hex: 'bg-[#fde047]', border: 'border-[#eab308]' },
+    { name: 'green', hex: 'bg-[#86efac]', border: 'border-[#4ade80]' },
+    { name: 'blue', hex: 'bg-[#93c5fd]', border: 'border-[#60a5fa]' },
+    { name: 'violet', hex: 'bg-[#d8b4fe]', border: 'border-[#c084fc]' },
+    { name: 'red', hex: 'bg-[#fca5a5]', border: 'border-[#f87171]' }
+];
 
 interface StickyNotesProps {
     meetingId: string;
+    readOnly?: boolean;
+    initialData?: any;
 }
 
-export default function BrainstormingStickyNotes({ meetingId }: StickyNotesProps) {
-    const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const { localParticipant } = useLocalParticipant();
-    const [initialData, setInitialData] = useState<any>({ elements: [] });
-    const lastElementsRef = useRef<any[]>([]);
+function StickyNotesContent({ meetingId, readOnly = false, initialData }: StickyNotesProps) {
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const { fitView } = useReactFlow();
 
-    // Fetch initial state
+    const nodeTypes = useMemo(() => ({
+        sticky: StickyNoteNode,
+    }), []);
+
+    const handleNodeChange = useCallback((id: string, newLabel: string) => {
+        if (readOnly) return;
+        setNodes((nds) =>
+            nds.map((node) => {
+                if (node.id === id) {
+                    return { ...node, data: { ...node.data, label: newLabel } };
+                }
+                return node;
+            })
+        );
+    }, [setNodes, readOnly]);
+
+    const addStickyNote = useCallback((colorObj: any) => {
+        if (readOnly) return;
+        const newNodeId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        const randomOffsetX = (Math.random() - 0.5) * 80;
+        const randomOffsetY = (Math.random() - 0.5) * 80;
+
+        const newNode: Node = {
+            id: newNodeId,
+            type: 'sticky',
+            position: { x: 400 + randomOffsetX, y: 300 + randomOffsetY },
+            data: { 
+                label: '', 
+                color: colorObj.hex, 
+                borderColor: colorObj.border,
+                onChange: handleNodeChange 
+            },
+        };
+
+        setNodes((nds) => [...nds, newNode]);
+    }, [setNodes, handleNodeChange, readOnly]);
+
+    // DB Sync Initialization
     useEffect(() => {
+        if (initialData) {
+            try {
+                const parsed = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
+                if (parsed.nodes && parsed.edges) {
+                    const loadedNodes = parsed.nodes.map((n: Node) => ({
+                        ...n,
+                        data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                    }));
+                    setNodes(loadedNodes);
+                    setEdges(parsed.edges);
+                }
+            } catch (e) {
+                console.error("Failed to parse initialData", e);
+            }
+            setIsLoaded(true);
+            return;
+        }
+
         fetch(`/api/brainstorming/stickyNotes?meetingId=${meetingId}`)
             .then(res => res.json())
             .then(data => {
-                if (data.state) {
-                    try {
-                        const parsedState = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-                        setInitialData(parsedState);
-                        lastElementsRef.current = parsedState.elements || [];
-                    } catch (e) {
-                         console.error("Failed to parse sticky notes state", e);
-                    }
+                if (data.state && Array.isArray(data.state.nodes) && Array.isArray(data.state.edges)) {
+                    const loadedNodes = data.state.nodes.map((n: Node) => ({
+                        ...n,
+                        data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                    }));
+                    setNodes(loadedNodes);
+                    setEdges(data.state.edges);
                 }
+                setIsLoaded(true);
             })
-            .catch(err => console.error("Initial fetch error:", err));
-    }, [meetingId]);
-
-    // Handle incoming real-time cursor/drawing data from other users
-    const handleRemoteChange = useCallback((msg: any) => {
-        if (!excalidrawAPI || !msg.payload) return;
-        
-        try {
-            const payloadStr = new TextDecoder().decode(msg.payload);
-            const remoteElements = JSON.parse(payloadStr);
-
-            const currentElements = excalidrawAPI.getSceneElements() || [];
-            const mergedElements = [...currentElements];
-
-            remoteElements.forEach((remoteEl: any) => {
-                const index = mergedElements.findIndex(el => el.id === remoteEl.id);
-                if (index === -1) {
-                    mergedElements.push(remoteEl);
-                } else if (remoteEl.version > mergedElements[index].version) {
-                    mergedElements[index] = remoteEl;
-                }
-                // Note: removed elements are trickier in Excalidraw (isDeleted property)
+            .catch(err => {
+                console.error("Initial fetch error:", err);
+                setIsLoaded(true);
             });
+    }, [meetingId, handleNodeChange, setNodes, setEdges, readOnly, initialData]);
 
-            excalidrawAPI.updateScene({ elements: mergedElements });
-            lastElementsRef.current = mergedElements;
-        } catch (err) {
-            console.error("Failed to parse incoming sticky notes update", err);
+    // Auto-fit when loaded or in read-only mode periodic fit
+    useEffect(() => {
+        if (isLoaded && readOnly) {
+            fitView({ padding: 0.2, duration: 800 });
         }
-    }, [excalidrawAPI]);
+    }, [isLoaded, readOnly, fitView, nodes.length]);
 
-    useDataChannel('sticky-notes-update', handleRemoteChange);
+    const onConnect = useCallback((params: Edge | Connection) => {
+        setEdges((eds) => addEdge({...params, animated: false, style: { stroke: '#94a3b8', strokeWidth: 3, strokeDasharray: '5,5' } }, eds));
+    }, [setEdges]);
 
-    const onChange = useCallback((elements: readonly any[], appState: any) => {
-        if (!localParticipant || !meetingId) return;
+    if (!isLoaded) return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white">Loading Notes...</div>;
 
-        const changedElements = elements.filter(el => {
-            const lastRootEl = lastElementsRef.current.find(le => le.id === el.id);
-            return !lastRootEl || lastRootEl.version < el.version;
-        });
-
-        if (changedElements.length > 0) {
-            try {
-                const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
-                localParticipant.publishData(payloadBytes, { topic: 'sticky-notes-update' }).catch((e: any) => {
-                     console.error("Failed to broadcast sticky notes update via LiveKit", e);
-                });
-            } catch (e) {
-                console.error("Failed to encode sticky notes update", e);
-            }
-
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = setTimeout(async () => {
-                try {
-                    await fetch('/api/brainstorming/stickyNotes', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            meetingId,
-                            state: { elements, appState }
-                        })
-                    });
-                } catch (err) {
-                    console.error("Failed to sync sticky notes to backend", err);
-                }
-            }, 1000);
+    const getNodeColor = (node: Node) => {
+        if (node.data?.color && typeof node.data.color === 'string') {
+            return node.data.color.replace('bg-[', '').replace(']', '');
         }
-        lastElementsRef.current = [...elements];
-    }, [localParticipant, meetingId]);
-
-    const addStickyNote = (color: string) => {
-        if (!excalidrawAPI) return;
-
-        const colorMap: Record<string, string> = {
-            'yellow': '#ffc034',
-            'green': '#40c057',
-            'light-blue': '#4dabf7',
-            'light-violet': '#e599f7',
-            'light-red': '#ff8787'
-        };
-
-        const hexColor = colorMap[color] || '#ffc034';
-        
-        const currentElements = excalidrawAPI.getSceneElements() || [];
-        const appState = excalidrawAPI.getAppState() || {};
-        
-        // Convert screen center to canvas coordinates
-        const zoom = appState.zoom?.value || 1;
-        const x = (-appState.scrollX + window.innerWidth / 2) / zoom - 100;
-        const y = (-appState.scrollY + window.innerHeight / 2) / zoom - 100;
-
-        const now = Date.now();
-        const noteId = `note-${now}`;
-        const textId = `note-text-${now}`;
-        
-        const newNote: any = {
-            type: "rectangle",
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000000),
-            isDeleted: false,
-            id: noteId,
-            x,
-            y,
-            width: 200,
-            height: 200,
-            strokeColor: "#000000",
-            backgroundColor: hexColor,
-            fillStyle: "solid",
-            strokeWidth: 1,
-            strokeStyle: "solid",
-            roundness: { type: 3 },
-            seed: Math.floor(Math.random() * 1000000000),
-            opacity: 100,
-            groupIds: [],
-            boundElements: [{ type: "text", id: textId }],
-            link: null,
-            locked: false,
-        };
-
-        const noteText: any = {
-            type: "text",
-            id: textId,
-            x: x + 100,
-            y: y + 100,
-            width: 0,
-            height: 0,
-            text: "",
-            fontSize: 20,
-            fontFamily: 1,
-            textAlign: "center",
-            verticalAlign: "middle",
-            strokeColor: "#1e1e1e",
-            backgroundColor: "transparent",
-            containerId: noteId,
-            version: 1,
-            versionNonce: Math.floor(Math.random() * 1000000000),
-            isDeleted: false,
-            groupIds: [],
-            boundElements: [],
-            link: null,
-            locked: false,
-            seed: Math.floor(Math.random() * 1000000000),
-            opacity: 100,
-            autoResize: true,
-        };
-
-        excalidrawAPI.updateScene({ 
-            elements: [...currentElements, newNote, noteText],
-            appState: { selectedElementIds: { [noteId]: true } }
-        });
+        return '#fde047';
     };
-
-    const handleRecenter = () => {
-        if (!excalidrawAPI) return;
-        excalidrawAPI.scrollToContent();
-    };
-
-    const colors = [
-        { name: 'yellow', hex: 'bg-[#ffc034]', border: 'border-[#ffae00]' },
-        { name: 'green', hex: 'bg-[#40c057]', border: 'border-[#37a44b]' },
-        { name: 'light-blue', hex: 'bg-[#4dabf7]', border: 'border-[#2793ec]' },
-        { name: 'light-violet', hex: 'bg-[#e599f7]', border: 'border-[#dc71f4]' },
-        { name: 'light-red', hex: 'bg-[#ff8787]', border: 'border-[#ff6666]' }
-    ];
 
     return (
-        <div className="w-full h-full relative bg-slate-800 overflow-hidden">
-            
+        <div className="w-full h-full relative bg-slate-800 overflow-hidden text-slate-900">
             {/* Custom Control Palette Overlay */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-3 bg-slate-800/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-700 shadow-2xl">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 mt-1 text-center leading-tight">
-                    Tools
-                </p>
-                <div className="flex flex-col gap-2">
-                    <button
-                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "selection" } } })}
-                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
-                        title="Select Tool"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
-                    </button>
-                    
-                    <button
-                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "arrow" } } })}
-                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
-                        title="Draw Arrow"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                    </button>
-                    
-                    <button
-                        onClick={() => excalidrawAPI?.updateScene({ appState: { activeTool: { type: "freedraw" } } })}
-                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors border border-slate-500/30 hover:border-slate-500/50 shadow-sm"
-                        title="Free Draw"
-                    >
-                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    </button>
+            {!readOnly && (
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-4 bg-slate-800/95 backdrop-blur-xl p-4 rounded-[24px] border border-slate-700 shadow-2xl">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">
+                        Add<br/>Note
+                    </p>
+                    {STICKY_COLORS.map((colorObj) => (
+                        <button
+                            key={colorObj.name}
+                            onClick={() => addStickyNote(colorObj)}
+                            className={`w-12 h-12 rounded-xl border-t-[6px] ${colorObj.hex} ${colorObj.border} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 opacity-90 hover:opacity-100 flex items-center justify-center group`}
+                            title={`Add ${colorObj.name} note`}
+                        >
+                            <svg className="w-6 h-6 text-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                    ))}
                 </div>
+            )}
 
-                <div className="w-full h-px bg-slate-600/50 my-1"></div>
+            <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={readOnly ? undefined : onNodesChange}
+                onEdgesChange={readOnly ? undefined : onEdgesChange}
+                onConnect={readOnly ? undefined : onConnect}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.2 }}
+                className="bg-slate-800"
+                nodesDraggable={!readOnly}
+                nodesConnectable={!readOnly}
+                elementsSelectable={!readOnly}
+            >
+                <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" />
+                <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />
+                <MiniMap 
+                    nodeStrokeColor={(n) => '#94a3b8'}
+                    nodeColor={getNodeColor}
+                    maskColor="rgba(0, 0, 0, 0.4)"
+                    className="bg-slate-700"
+                />
+            </ReactFlow>
 
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">
-                    New<br/>Note
-                </p>
-                {colors.map((colorObj) => (
-                    <button
-                        key={colorObj.name}
-                        onClick={() => addStickyNote(colorObj.name)}
-                        className={`w-10 h-10 rounded-xl ${colorObj.hex} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 border-2 ${colorObj.border} opacity-90 hover:opacity-100 flex items-center justify-center group`}
-                        title={`Add ${colorObj.name} sticky note`}
-                    >
-                        <svg className="w-5 h-5 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                ))}
-            </div>
-
-            {/* Focus Map Button */}
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button
-                    onClick={handleRecenter}
-                    className="flex items-center gap-2 px-3 py-2 bg-slate-800 backdrop-blur-md hover:bg-slate-700 text-white border border-slate-700 rounded-lg shadow-xl transition-colors text-sm font-medium"
-                    title="Center View"
-                >
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" /></svg>
-                    Focus View
-                </button>
-            </div>
-            
-            {/* Instructions Overlay */}
-            <div className="absolute bottom-4 left-4 z-10 bg-slate-800/90 backdrop-blur-xl px-4 py-3 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl ml-16">
-                <p className="font-bold text-white mb-2 flex items-center gap-1.5 text-sm border-b border-slate-700 pb-1.5">
-                   <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+             {/* Instructions Overlay */}
+             {!readOnly && (
+                 <div className="absolute bottom-6 left-28 z-10 bg-slate-800/90 backdrop-blur-xl px-5 py-4 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl">
+                <p className="font-bold text-white mb-2 flex items-center gap-2 text-sm border-b border-slate-700 pb-2">
+                   <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                    Sticky Notes Wall
                 </p>
-                <div className="space-y-1">
+                <div className="space-y-1.5 text-[13px]">
                     <p>• <span className="text-emerald-400 font-medium">Click a color</span> to drop a note</p>
-                    <p>• <span className="text-white font-medium">Drag</span> the background to pan</p>
-                    <p>• <span className="text-white font-medium">Draw arrows</span> to connect ideas</p>
+                    <p>• <span className="text-white font-medium">Drag from edges</span> to connect strings between notes</p>
                 </div>
             </div>
+             )}
 
-            {/* Canvas Engine */}
-            <div className="absolute inset-0 z-0 hide-excalidraw-ui">
-                <style jsx global>{`
-                    .hide-excalidraw-ui .excalidraw .App-toolbar-container,
-                    .hide-excalidraw-ui .excalidraw .layer-ui__wrapper .Island:not(.App-toolbar),
-                    .hide-excalidraw-ui .excalidraw .App-menu {
-                        display: none !important;
-                    }
-                `}</style>
-                <Excalidraw
-                    excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
-                    initialData={initialData}
-                    onChange={onChange}
-                    theme="dark"
-                    UIOptions={{
-                        canvasActions: { loadScene: false, export: false, saveAsImage: false, clearCanvas: false },
-                        welcomeScreen: false
+            {!readOnly && (
+                <StickyNotesLiveKitSync 
+                    nodes={nodes} 
+                    edges={edges} 
+                    meetingId={meetingId} 
+                    isLoaded={isLoaded}
+                    onRemoteUpdate={(incoming) => {
+                        const restoredNodes = incoming.nodes.map((n: any) => ({
+                            ...n,
+                            data: { ...n.data, onChange: handleNodeChange }
+                        }));
+                        setNodes(restoredNodes);
+                        setEdges(incoming.edges);
                     }}
                 />
-            </div>
+            )}
         </div>
     );
+}
+
+export default function BrainstormingStickyNotes(props: StickyNotesProps) {
+    return (
+        <ReactFlowProvider>
+            <StickyNotesContent {...props} />
+        </ReactFlowProvider>
+    );
+}
+
+interface SyncProps {
+    nodes: Node[];
+    edges: Edge[];
+    meetingId: string;
+    isLoaded: boolean;
+    onRemoteUpdate: (state: any) => void;
+}
+
+function StickyNotesLiveKitSync({ nodes, edges, meetingId, isLoaded, onRemoteUpdate }: SyncProps) {
+    const { localParticipant } = useLocalParticipant();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Broadcast Changes
+    useEffect(() => {
+        if (!isLoaded || !localParticipant) return;
+        
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(async () => {
+            const cleanNodes = nodes.map(n => ({...n, data: { ...n.data, onChange: undefined }}));
+            const stateToSave = { nodes: cleanNodes, edges };
+            
+            try {
+                const payloadStr = JSON.stringify(stateToSave);
+                const payloadBytes = new TextEncoder().encode(payloadStr);
+                localParticipant.publishData(payloadBytes, { topic: 'stickynotes-reactflow' }).catch(() => {});
+            } catch (e) {}
+
+            try {
+                await fetch('/api/brainstorming/stickyNotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, state: stateToSave })
+                });
+            } catch (err) {}
+        }, 1000);
+
+        return () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        };
+    }, [nodes, edges, meetingId, localParticipant, isLoaded]);
+
+    // Receive Changes
+    useDataChannel('stickynotes-reactflow', (msg) => {
+        try {
+            const payloadStr = new TextDecoder().decode(msg.payload);
+            const incomingState = JSON.parse(payloadStr);
+            if (incomingState.nodes && incomingState.edges) {
+                onRemoteUpdate(incomingState);
+            }
+        } catch (err) {}
+    });
+
+    return null;
 }
