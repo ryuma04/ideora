@@ -67,7 +67,7 @@ function VideoTile({ trackRef }: { trackRef: any }) {
     // Let's stick to simple video element but handle the mute state
 
     return (
-        <div className="relative w-full h-full bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-xl flex items-center justify-center">
+        <div className="relative w-full h-full bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
             {/* Video or Avatar */}
             {!isVideoMuted && publication?.track ? (
                 <video
@@ -80,15 +80,15 @@ function VideoTile({ trackRef }: { trackRef: any }) {
                 />
             ) : (
                 // Avatar View
-                <div className="flex flex-col items-center justify-center w-full h-full bg-slate-900">
+                <div className="flex flex-col items-center justify-center w-full h-full bg-slate-50">
                     {metadata.profileImage ? (
                         <img
                             src={metadata.profileImage}
                             alt={participant.identity}
-                            className="w-32 h-32 rounded-full object-cover border-4 border-slate-700 shadow-2xl"
+                            className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md"
                         />
                     ) : (
-                        <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg border-4 border-slate-700">
+                        <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold text-white shadow-md border-4 border-white">
                             {participant.identity?.slice(0, 2).toUpperCase() || "??"}
                         </div>
                     )}
@@ -96,7 +96,7 @@ function VideoTile({ trackRef }: { trackRef: any }) {
             )}
 
             {/* Name Tag */}
-            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2">
+            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-800 shadow-sm border border-slate-200 flex items-center gap-2">
                 <span>{participant.identity}</span>
                 {participant.isMicrophoneEnabled ? (
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -449,16 +449,16 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
     };
 
     return (
-        <div className="flex flex-col h-screen bg-slate-900 text-white font-sans relative">
+        <div className="flex flex-col h-screen bg-[#FAFAFA] text-slate-900 font-sans relative">
             {/* Header */}
-            <header className="px-6 py-4 flex justify-between items-center bg-slate-800/50 backdrop-blur-md border-b border-slate-700/50 z-10">
+            <header className="px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                         </div>
                         <div>
-                            <h1 className="text-lg font-bold text-white tracking-tight leading-tight">{title || `Meeting: ${meetingId}`}</h1>
+                            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">{title || `Meeting: ${meetingId}`}</h1>
                             <div className="flex items-center gap-2">
                                 <span className={`w-2 h-2 rounded-full ${roomState === ConnectionState.Connected ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></span>
                                 <span className="text-xs text-slate-400 font-medium">
@@ -471,7 +471,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                     <div className="h-8 w-px bg-slate-700/50 hidden md:block"></div>
 
                     {/* Timer Display */}
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${secondsLeft < 300 ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-slate-700/30 border-slate-700 text-slate-300'} transition-colors duration-300`}>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm ${secondsLeft < 300 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-200 text-slate-600'} transition-colors duration-300`}>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <span className="font-mono font-bold text-sm tracking-wider">
                             {formatTime(secondsLeft)}
@@ -586,23 +586,23 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
                 {/* Sidebar (Participants & Chat) */}
                 {showParticipants && (
-                    <aside className="w-80 bg-slate-800/50 backdrop-blur-xl border-l border-slate-700/50 flex flex-col h-full animate-in slide-in-from-right duration-300">
+                    <aside className="w-80 bg-white/80 backdrop-blur-xl border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-300">
 
                         {/* Tabs Header */}
-                        <div className="flex items-center border-b border-slate-700/50">
+                        <div className="flex items-center border-b border-slate-200">
                             <button
                                 onClick={() => setActiveTab('participants')}
-                                className={`flex-1 py-4 text-sm font-bold text-center transition-colors ${activeTab === 'participants' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-indigo-300'}`}
+                                className={`flex-1 py-4 text-sm font-bold text-center transition-colors ${activeTab === 'participants' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-indigo-600'}`}
                             >
                                 Participants ({participants.length})
                             </button>
                             <button
                                 onClick={() => setActiveTab('chat')}
-                                className={`flex-1 py-4 text-sm font-bold text-center transition-colors ${activeTab === 'chat' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-indigo-300'}`}
+                                className={`flex-1 py-4 text-sm font-bold text-center transition-colors ${activeTab === 'chat' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-indigo-600'}`}
                             >
                                 Chat
                             </button>
-                            <button onClick={() => setShowParticipants(false)} className="px-4 text-slate-400 hover:text-white">
+                            <button onClick={() => setShowParticipants(false)} className="px-4 text-slate-400 hover:text-slate-900">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -660,17 +660,17 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                                                 let metadata = { profileImage: "" };
                                                 try { if (p.metadata) metadata = JSON.parse(p.metadata); } catch (e) { }
                                                 return (
-                                                    <div key={p.sid} className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors">
+                                                    <div key={p.sid} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors shadow-sm">
                                                         {metadata.profileImage ? (
-                                                            <img src={metadata.profileImage} alt={p.identity} className="w-10 h-10 rounded-full border border-slate-600 object-cover" />
+                                                            <img src={metadata.profileImage} alt={p.identity} className="w-10 h-10 rounded-full border border-slate-200 object-cover shadow-sm" />
                                                         ) : (
-                                                            <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                                            <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm border border-indigo-500">
                                                                 {p.identity?.slice(0, 2).toUpperCase()}
                                                             </div>
                                                         )}
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="font-medium text-sm truncate">{p.identity} {p === localParticipant && "(You)"}</p>
-                                                            {isHost && p === localParticipant && <p className="text-[10px] text-indigo-400">Host</p>}
+                                                            <p className="font-medium text-sm text-slate-900 truncate">{p.identity} {p === localParticipant && "(You)"}</p>
+                                                            {isHost && p === localParticipant && <p className="text-[10px] text-indigo-600 font-semibold uppercase tracking-widest mt-0.5">Host</p>}
                                                         </div>
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             {p.isMicrophoneEnabled ? (
@@ -699,7 +699,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                                                 const isMe = msg.from === localParticipant;
                                                 return (
                                                     <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                                        <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-700 text-white rounded-bl-none'
+                                                        <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm border border-transparent ${isMe ? 'bg-indigo-600 text-white rounded-br-none shadow-indigo-500/20' : 'bg-white text-slate-800 border-slate-200 rounded-bl-none shadow-black/5'
                                                             }`}>
                                                             {msg.message}
                                                         </div>
@@ -711,13 +711,13 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                                             })
                                         )}
                                     </div>
-                                    <form onSubmit={handleSendChat} className="bg-slate-800 p-2 rounded-xl border border-slate-700 flex gap-2">
+                                    <form onSubmit={handleSendChat} className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex gap-2">
                                         <input
                                             type="text"
                                             value={draft}
                                             onChange={(e) => setDraft(e.target.value)}
                                             placeholder="Type a message..."
-                                            className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-slate-500 px-2"
+                                            className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 placeholder-slate-400 px-2"
                                         />
                                         <button
                                             type="submit"
@@ -735,13 +735,13 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
             </div>
 
             {/* Premium Control Bar */}
-            <footer className={`${isBrainstormingMode ? 'h-20 pb-2' : 'h-24 pb-4'} bg-slate-900/90 backdrop-blur-xl border-t border-slate-800 flex items-center justify-center gap-8 transition-all duration-300`}>
-                <div className={`flex items-center gap-6 bg-slate-800/50 ${isBrainstormingMode ? 'px-6 py-2' : 'px-8 py-4'} rounded-2xl border border-slate-700/50 shadow-2xl transition-all duration-300`}>
+            <footer className={`${isBrainstormingMode ? 'h-20 pb-2' : 'h-24 pb-4'} bg-white/90 backdrop-blur-xl border-t border-slate-200 flex items-center justify-center gap-8 transition-all duration-300`}>
+                <div className={`flex items-center gap-6 bg-slate-50 ${isBrainstormingMode ? 'px-6 py-2' : 'px-8 py-4'} rounded-2xl border border-slate-200 shadow-lg transition-all duration-300`}>
                     <button
                         onClick={toggleMic}
-                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${micOn
-                            ? 'bg-slate-700 text-white hover:bg-slate-600 shadow-lg shadow-black/20'
-                            : 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
+                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${micOn
+                            ? 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                            : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                             }`}
                     >
                         {micOn ? (
@@ -753,9 +753,9 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
                     <button
                         onClick={toggleCamera}
-                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${camOn
-                            ? 'bg-slate-700 text-white hover:bg-slate-600 shadow-lg shadow-black/20'
-                            : 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
+                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${camOn
+                            ? 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                            : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                             }`}
                     >
                         {camOn ? (
@@ -769,9 +769,9 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                     {!isGuest && (
                         <button
                             onClick={toggleScreenShare}
-                            className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${screenShareOn
-                                ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-500/30'
-                                : 'bg-slate-700 text-white hover:bg-slate-600 shadow-lg shadow-black/20'
+                            className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${screenShareOn
+                                ? 'bg-indigo-600 text-white border-transparent hover:bg-indigo-500 shadow-indigo-500/30'
+                                : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                                 }`}
                             title="Share Screen"
                         >
@@ -786,14 +786,14 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                     {/* Participants Toggle Button */}
                     <button
                         onClick={() => setShowParticipants(!showParticipants)}
-                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${showParticipants
-                            ? 'bg-slate-600 text-white ring-2 ring-inset ring-indigo-500'
-                            : 'bg-slate-700 text-white hover:bg-slate-600 shadow-lg shadow-black/20'
+                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${showParticipants
+                            ? 'bg-indigo-50 text-indigo-600 border-indigo-200 ring-2 ring-inset ring-indigo-500'
+                            : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             }`}
                         title="Participants"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-bold">
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-white text-[10px] font-bold">
                             {participants.length}
                         </span>
                     </button>
@@ -803,8 +803,8 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                         <button
                             onClick={() => audioContextState === 'suspended' ? startRecording() : null}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300 ${isRecording && audioContextState === 'running'
-                                ? 'bg-red-500/10 border-red-500/30 text-red-500 animate-pulse'
-                                : 'bg-slate-700/30 border-slate-700 text-slate-400'
+                                ? 'bg-red-50 border-red-200 text-red-600 animate-pulse'
+                                : 'bg-slate-100 border-slate-200 text-slate-500'
                                 }`}
                             title={audioContextState === 'suspended' ? 'Click to enable recording' : 'Recording Status'}
                         >
@@ -817,19 +817,19 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
                     <button
                         onClick={() => setIsBrainstormingMode(!isBrainstormingMode)}
-                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 ${isBrainstormingMode
-                            ? 'bg-yellow-500/20 text-yellow-400 ring-2 ring-inset ring-yellow-500'
-                            : 'bg-slate-700 text-white hover:bg-slate-600 shadow-lg shadow-black/20'
+                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${isBrainstormingMode
+                            ? 'bg-yellow-50 text-yellow-600 border-yellow-200 ring-2 ring-inset ring-yellow-500'
+                            : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             }`}
                         title="Brainstorming Mode"
                     >
                         {/* brainstorming icon bulb */}
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                        <span className="absolute -top-1 -right-2 flex h-4 px-1.5 min-w-[20px] items-center justify-center rounded-full bg-yellow-500 text-[10px] text-slate-900 font-bold">
+                        <span className="absolute -top-1 -right-2 flex h-4 px-1.5 min-w-[20px] items-center justify-center rounded-full bg-yellow-500 text-[10px] text-white font-bold">
                             {isBrainstormingMode ? 'On' : 'Off'}
                         </span>
                     </button>
-                    <div className="w-px h-10 bg-slate-700 mx-2"></div>
+                    <div className="w-px h-10 bg-slate-200 mx-2"></div>
 
                     {isHost ? (
                         <button
@@ -846,7 +846,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                     ) : (
                         <button
                             onClick={handleLeaveMeeting}
-                            className="px-8 py-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-black/20"
+                            className="px-8 py-4 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-sm"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                             Leave
