@@ -47,6 +47,13 @@ function VerifyEmailContent() {
         <div className={styles.container}>
             <div className={styles.wrapper}>
                 <div className={styles.card}>
+                    <div className="flex justify-center mb-4">
+                        <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                    </div>
                     <h2 className={styles.heading}>Verify Your Email</h2>
 
                     {status === 'loading' && (
@@ -93,14 +100,14 @@ export default function VerifyEmailPage() {
 }
 
 const styles = {
-    container: 'min-h-screen flex items-center justify-center bg-slate-50 px-4',
-    wrapper: 'w-full max-w-md',
-    card: 'bg-white rounded-lg shadow p-8 text-center',
-    heading: 'text-2xl font-bold mb-4 text-slate-900',
-    loadingText: 'text-slate-700',
-    waitingText: 'text-slate-700',
-    successGroup: 'space-y-4',
-    successText: 'text-green-600 font-medium',
-    button: 'inline-block px-8 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors',
-    errorText: 'text-red-600'
+    container: 'relative min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 sm:px-6 lg:px-8',
+    wrapper: 'max-w-[420px] w-full mx-auto z-10',
+    card: 'bg-white rounded-2xl shadow-[0_0_50px_-12px_rgba(79,70,229,0.25)] ring-1 ring-indigo-500/20 p-8 sm:p-10 text-center opacity-0 animate-fade-in-up relative',
+    heading: 'text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 mb-6',
+    loadingText: 'text-slate-600',
+    waitingText: 'text-slate-600 leading-relaxed',
+    successGroup: 'space-y-6 mt-4',
+    successText: 'text-green-600 font-medium bg-green-50 py-3 px-4 rounded-xl border border-green-100',
+    button: 'inline-block w-full py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all duration-200 shadow-sm shadow-indigo-600/20',
+    errorText: 'text-red-600 bg-red-50 py-3 px-4 rounded-xl border border-red-100 mt-4'
 };
