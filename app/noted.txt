@@ -7,7 +7,7 @@ External library installed:
     6. crypto: for encryption
     7. livekit: for video conferencing
     8. cloudinary: for profile picture
-    9. tldraw: for brainstorming canvas
+    9. Excalidraw: for brainstorming canvas
     10. redis: for temporary storage of the "Current Session State"
     11. jspdf, html2canvas: for exporting the brainstorming canvas to pdf
 
