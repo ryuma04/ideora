@@ -9,6 +9,7 @@ import {
     useParticipants,
     useChat,
     ParticipantTile,
+    RoomAudioRenderer,
 } from "@livekit/components-react";
 import { Track, ConnectionState, RemoteParticipant } from "livekit-client";
 import { useEffect, useState, useRef } from "react";
@@ -1053,6 +1054,7 @@ export default function MeetingRoom() {
             serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
             className="h-full w-full bg-slate-900"
         >
+            <RoomAudioRenderer />
             <MeetingContent
                 meetingId={meetingId || ""}
                 meetingDbId={meeting?._id}
