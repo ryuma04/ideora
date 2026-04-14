@@ -6,8 +6,8 @@ import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
 
 // Excalidraw is client-side only
 const Excalidraw = dynamic(
-  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
-  { ssr: false }
+    async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+    { ssr: false }
 );
 
 interface CanvasProps {
@@ -33,7 +33,7 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
                 }
                 lastElementsRef.current = parsedState.elements || [];
             } catch (e) {
-                 console.error("Failed to parse initial canvas state", e);
+                console.error("Failed to parse initial canvas state", e);
             }
             return;
         }
@@ -53,7 +53,7 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
                         }
                         lastElementsRef.current = parsedState.elements || [];
                     } catch (e) {
-                         console.error("Failed to parse initial canvas state", e);
+                        console.error("Failed to parse initial canvas state", e);
                     }
                 }
             })
@@ -62,9 +62,9 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
 
     const onChange = useCallback((elements: readonly any[], appState: any) => {
         if (readOnly) return;
-        
-        // Update local ref to track changes
-        lastElementsRef.current = [...elements];
+
+        // Removed updating `lastElementsRef` here. The `setInterval` in `CanvasLiveKitSync`
+        // will now be able to accurately diff the elements.
     }, [readOnly]);
 
     return (
@@ -87,7 +87,7 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
             />
 
             {!readOnly && (
-                <CanvasLiveKitSync 
+                <CanvasLiveKitSync
                     excalidrawAPI={excalidrawAPI}
                     meetingId={meetingId}
                     lastElementsRef={lastElementsRef}
@@ -109,60 +109,50 @@ function CanvasLiveKitSync({ excalidrawAPI, meetingId, lastElementsRef }: SyncPr
 
     // Broadcast Changes
     useEffect(() => {
-        let hasSavedIntial = false;
-
         const interval = setInterval(() => {
             if (!excalidrawAPI || !localParticipant || !meetingId) return;
-            
+
             const elements = excalidrawAPI.getSceneElements();
             if (!elements) return;
-
-            // Initial generic save to ensure document is created even if user never draws
-            if (!hasSavedIntial && elements.length === 0) {
-                hasSavedIntial = true;
-                setTimeout(async () => {
-                    try {
-                        await fetch('/api/brainstorming/canvas', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                meetingId,
-                                action: 'save_to_db',
-                                state: { elements: [], appState: excalidrawAPI.getAppState() }
-                            })
-                        });
-                    } catch (err) {}
-                }, 2000);
-            }
 
             // Simple diffing using versions
             const changedElements = elements.filter((el: any) => {
                 const lastEl = lastElementsRef.current.find(le => le.id === el.id);
-                return !lastEl || lastEl.version > (lastEl?.version || 0); // Check if version is bumped
+                return !lastEl || el.version > lastEl.version; // Check if version is bumped
             });
 
             if (changedElements.length > 0) {
                 // Publish to LiveKit
                 try {
                     const payloadBytes = new TextEncoder().encode(JSON.stringify(changedElements));
-                    localParticipant.publishData(payloadBytes, { topic: 'canvas-update' }).catch(() => {});
-                } catch (e) {}
+                    localParticipant.publishData(payloadBytes, { topic: 'canvas-update' }).catch(() => { });
+                } catch (e) { }
 
                 // Sync to DB (debounced)
                 if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
                 saveTimeoutRef.current = setTimeout(async () => {
                     try {
                         const allElements = excalidrawAPI.getSceneElements();
+                        const payloadState = { elements: allElements, appState: excalidrawAPI.getAppState() };
+
+                        // Save to Redis (Live cache)
+                        await fetch('/api/brainstorming/canvas', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ meetingId, state: payloadState })
+                        });
+
+                        // Save to DB (Persistent storage for documents)
                         await fetch('/api/brainstorming/canvas', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 meetingId,
                                 action: 'save_to_db',
-                                state: { elements: allElements, appState: excalidrawAPI.getAppState() }
+                                state: payloadState
                             })
                         });
-                    } catch (err) {}
+                    } catch (err) { }
                 }, 1500);
 
                 lastElementsRef.current = [...elements];
@@ -196,7 +186,7 @@ function CanvasLiveKitSync({ excalidrawAPI, meetingId, lastElementsRef }: SyncPr
 
             excalidrawAPI.updateScene({ elements: mergedElements });
             lastElementsRef.current = mergedElements;
-        } catch (err) {}
+        } catch (err) { }
     });
 
     return null;

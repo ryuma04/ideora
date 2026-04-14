@@ -211,10 +211,18 @@ function SwotLiveKitSync({ swotData, meetingId, onRemoteUpdate }: SyncProps) {
             } catch (e) {}
 
             try {
+                // Save to Redis Live Cache
                 await fetch('/api/brainstorming/swotAnalysis', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, state: swotData })
+                });
+
+                // Save to MongoDB Persistence
+                await fetch('/api/brainstorming/swotAnalysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: swotData })
                 });
             } catch (err) {}
         }, 1000);

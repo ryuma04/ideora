@@ -251,6 +251,11 @@ function MindmapLiveKitSync({ nodes, edges, meetingId, isLoaded, onRemoteUpdate 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, state: stateToSave })
                 });
+                await fetch('/api/brainstorming/mindmapping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: stateToSave })
+                });
             } catch (err) {}
         }, 1000);
 

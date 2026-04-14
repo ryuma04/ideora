@@ -132,6 +132,10 @@ export default function MeetingDocumentViewer() {
                         scale: 2,
                         useCORS: true,
                         allowTaint: true,
+                        windowWidth: element.scrollWidth,
+                        windowHeight: element.scrollHeight,
+                        x: 0,
+                        scrollY: -window.scrollY,
                         backgroundColor: tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc',
                         onclone: (clonedDoc) => {
                             const selectors = ['.react-flow__controls', '.react-flow__minimap', 'button', '.absolute.bottom-4.left-4'];
@@ -281,20 +285,19 @@ export default function MeetingDocumentViewer() {
                     })}
                 </div>
 
-                {/* Content area captured for PDF export */}
-                <div ref={contentRef} className="flex-1 flex flex-col min-h-[600px]">
+                <div ref={contentRef} className="flex-1 flex flex-col h-[700px] relative mt-4">
                     {activeTab === 'canvas' && (
-                        <div className="flex-1 relative rounded-xl overflow-hidden shadow-2xl bg-white min-h-[600px] border border-slate-200">
+                        <div className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 z-10 w-full h-full">
                             <BrainstormingCanvas meetingId={meetingId || ""} readOnly={true} initialData={docs.canvas} />
                         </div>
                     )}
                     {activeTab === 'mindmap' && (
-                        <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-900 min-h-[600px]">
+                        <div className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-slate-900 border border-slate-700 z-10 w-full h-full">
                             <BrainstormingMindmapping meetingId={meetingId || ""} readOnly={true} initialData={docs.mindmap} />
                         </div>
                     )}
                     {activeTab === 'stickyNotes' && (
-                        <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-900 min-h-[600px]">
+                        <div className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-slate-900 border border-slate-700 z-10 w-full h-full">
                              <BrainstormingStickyNotes meetingId={meetingId || ""} readOnly={true} initialData={docs.stickyNotes} />
                         </div>
                     )}
