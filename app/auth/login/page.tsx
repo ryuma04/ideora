@@ -142,8 +142,24 @@ export default function LoginPage() {
                                 {loading ? 'Checking...' : 'Enter Platform'}
                             </button>
 
+                            {/* Guest Option */}
+                            <div className="pt-2">
+                                <div className="relative flex items-center py-4">
+                                    <div className="flex-grow border-t border-slate-100"></div>
+                                    <span className="flex-shrink-0 mx-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Or</span>
+                                    <div className="flex-grow border-t border-slate-100"></div>
+                                </div>
+                                <button
+                                    onClick={() => router.push('/meeting/joinMeeting')}
+                                    className="w-full py-4 px-6 bg-white text-slate-700 rounded-2xl font-bold hover:bg-slate-50 border-2 border-slate-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+                                >
+                                    <svg className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                    Continue as Guest
+                                </button>
+                            </div>
+
                             {/* Signup Link */}
-                            <p className="text-center text-sm text-slate-400 font-medium pt-8">
+                            <p className="text-center text-sm text-slate-400 font-medium pt-6">
                                 No account yet? <button onClick={() => router.push('/auth/signup')} className="text-indigo-600 hover:text-indigo-700 font-bold transition-colors ml-1 underline decoration-2 underline-offset-4">Create One</button>
                             </p>
                         </div>
