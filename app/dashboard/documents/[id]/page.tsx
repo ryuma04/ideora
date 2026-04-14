@@ -131,26 +131,41 @@ export default function MeetingDocumentViewer() {
                     const canvas = await html2canvas(element, {
                         scale: 2,
                         useCORS: true,
-                        allowTaint: true,
-                        windowWidth: element.scrollWidth,
-                        windowHeight: element.scrollHeight,
-                        x: 0,
-                        scrollY: -window.scrollY,
+                        logging: false,
                         backgroundColor: tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc',
                         onclone: (clonedDoc) => {
-                            const selectors = ['.react-flow__controls', '.react-flow__minimap', 'button', '.absolute.bottom-4.left-4'];
+                            // Aggressively hide UI components in the capture
+                            const selectors = [
+                                '.react-flow__controls', 
+                                '.react-flow__minimap', 
+                                'button', 
+                                '.absolute.bottom-4.left-4',
+                                '.absolute.bottom-6.left-28'
+                            ];
                             selectors.forEach(s => {
-                                const el = clonedDoc.querySelector(s);
-                                if (el) (el as HTMLElement).style.display = 'none';
+                                clonedDoc.querySelectorAll(s).forEach(el => {
+                                    (el as HTMLElement).style.setProperty('display', 'none', 'important');
+                                });
                             });
-                            const rf = clonedDoc.querySelector('.react-flow');
-                            if (rf) (rf as HTMLElement).style.backgroundColor = tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc';
+                            const rf = clonedDoc.querySelector('.react-flow') as HTMLElement;
+                            if (rf) rf.style.backgroundColor = tab === 'mindmap' || tab === 'stickyNotes' ? '#0f172a' : '#f8fafc';
                         }
                     });
                     
-                    imgData = canvas.toDataURL('image/jpeg', 0.9);
+                    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+                        console.error(`Capture failed for tab: ${tab}`);
+                        continue;
+                    }
+
+                    imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const imgAspect = canvas.width / canvas.height;
                     const slotAspect = (pageWidth - 20) / (pageHeight - 28);
+
+                    if (!isFinite(imgAspect) || isNaN(imgAspect)) {
+                        console.error(`Invalid aspect ratio for tab: ${tab}`);
+                        continue;
+                    }
+
                     if (imgAspect > slotAspect) {
                         imgW = pageWidth - 20;
                         imgH = (pageWidth - 20) / imgAspect;
@@ -159,7 +174,7 @@ export default function MeetingDocumentViewer() {
                         imgW = (pageHeight - 28) * imgAspect;
                     }
 
-                    if (imgData) {
+                    if (imgData && imgW > 0 && imgH > 0) {
                         const imgX = (pageWidth - imgW) / 2;
                         const imgY = 18 + ((pageHeight - 28) - imgH) / 2;
                         pdf.addImage(imgData, 'JPEG', imgX, imgY, imgW, imgH, undefined, 'FAST');

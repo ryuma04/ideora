@@ -164,13 +164,15 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                 elementsSelectable={!readOnly}
             >
                 <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" />
-                <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />
-                <MiniMap 
-                    nodeStrokeColor={(n) => '#94a3b8'}
-                    nodeColor={getNodeColor}
-                    maskColor="rgba(0, 0, 0, 0.4)"
-                    className="bg-slate-700"
-                />
+                {!readOnly && <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />}
+                {!readOnly && (
+                    <MiniMap 
+                        nodeStrokeColor={(n) => '#94a3b8'}
+                        nodeColor={getNodeColor}
+                        maskColor="rgba(0, 0, 0, 0.4)"
+                        className="bg-slate-700"
+                    />
+                )}
             </ReactFlow>
 
              {/* Instructions Overlay */}

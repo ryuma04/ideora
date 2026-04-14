@@ -162,13 +162,15 @@ function MindmapContent({ meetingId, readOnly = false, initialData }: MindmapPro
                 elementsSelectable={!readOnly}
             >
                 <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#334155" />
-                <Controls className="bg-slate-800 border-slate-700 fill-white text-white" />
-                <MiniMap 
-                    nodeStrokeColor={() => '#2dd4bf'}
-                    nodeColor={() => '#1e293b'}
-                    maskColor="rgba(0, 0, 0, 0.5)"
-                    className="bg-slate-800"
-                />
+                {!readOnly && <Controls className="bg-slate-800 border-slate-700 fill-white text-white" />}
+                {!readOnly && (
+                    <MiniMap 
+                        nodeStrokeColor={() => '#2dd4bf'}
+                        nodeColor={() => '#1e293b'}
+                        maskColor="rgba(0, 0, 0, 0.5)"
+                        className="bg-slate-800"
+                    />
+                )}
             </ReactFlow>
 
              {/* Mindmap specific instructions on bottom left */}
