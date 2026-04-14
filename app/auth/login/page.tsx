@@ -150,6 +150,7 @@ export default function LoginPage() {
                                     <div className="flex-grow border-t border-slate-100"></div>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => router.push('/meeting/joinMeeting')}
                                     className="w-full py-4 px-6 bg-white text-slate-700 rounded-2xl font-bold hover:bg-slate-50 border-2 border-slate-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
                                 >
