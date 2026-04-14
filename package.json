@@ -12,15 +12,18 @@
     "@excalidraw/excalidraw": "^0.18.0",
     "@livekit/components-react": "^2.9.19",
     "@livekit/components-styles": "^1.2.0",
+    "@types/lodash": "^4.17.24",
     "axios": "^1.13.4",
     "html2canvas-pro": "^2.0.2",
     "jspdf": "^4.2.0",
     "livekit-client": "^2.17.1",
+    "lodash": "^4.18.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.6.0",
     "reactflow": "^11.11.4",
+    "socket.io-client": "^4.8.3",
     "tldraw": "^4.4.0"
   },
   "devDependencies": {

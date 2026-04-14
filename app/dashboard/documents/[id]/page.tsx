@@ -5,10 +5,10 @@ import dynamic from 'next/dynamic';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 
-const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brainstormingMindmapping'), { ssr: false });
-const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brainstormingStickyNotes'), { ssr: false });
-const BrainstormingCanvas = dynamic(() => import('@/app/brainstorming/brainstormingCanvas'), { ssr: false });
-const BrainstormingSwotAnalysis = dynamic(() => import('@/app/brainstorming/brainstormingSwotAnalysis'), { ssr: false });
+const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brainstormingMindmapping').then(mod => mod.default), { ssr: false });
+const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brainstormingStickyNotes').then(mod => mod.default), { ssr: false });
+const BrainstormingCanvas = dynamic(() => import('@/app/brainstorming/brainstormingCanvas').then(mod => mod.default), { ssr: false });
+const BrainstormingSwotAnalysis = dynamic(() => import('@/app/brainstorming/brainstormingSwotAnalysis').then(mod => mod.default), { ssr: false });
 
 export default function MeetingDocumentViewer() {
     const router = useRouter();

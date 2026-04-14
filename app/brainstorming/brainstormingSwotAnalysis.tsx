@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+import { useSocketSync } from "@/hooks/useSocketSync";
 
 type SWOTQuadrant = 'strengths' | 'weaknesses' | 'opportunities' | 'threats';
 
@@ -18,14 +18,15 @@ interface SWOTProps {
     initialData?: SWOTState;
 }
 
-export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false, initialData }: SWOTProps) {
-    const [swotData, setSwotData] = useState<SWOTState>(initialData || {
+export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false, initialData: propInitialData }: SWOTProps) {
+    const [swotData, setSwotData] = useState<SWOTState>(propInitialData || {
         strengths: ["Great team", "Strong tech stack"],
         weaknesses: [],
         opportunities: [],
         threats: [],
     });
     const [isLoaded, setIsLoaded] = useState(false);
+    const { socket, isRemoteUpdate, performRemoteAction } = useSocketSync(meetingId);
 
     const [inputs, setInputs] = useState({
         strengths: '',
@@ -36,9 +37,9 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
 
     // Initial DB Fetch
     useEffect(() => {
-        if (initialData) {
+        if (propInitialData) {
             try {
-                const parsed = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
+                const parsed = typeof propInitialData === 'string' ? JSON.parse(propInitialData) : propInitialData;
                 setSwotData(parsed);
             } catch (e) {
                 console.error("Failed to parse SWOT Data:", e);
@@ -60,7 +61,7 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
                 console.error("Initial fetch error:", err);
                 setIsLoaded(true);
             });
-    }, [meetingId, initialData]);
+    }, [meetingId, propInitialData]);
 
     const handleAddPoint = (quadrant: SWOTQuadrant, e: React.FormEvent) => {
         e.preventDefault();
@@ -68,27 +69,90 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
         const value = inputs[quadrant].trim();
         if (!value) return;
 
-        setSwotData(prev => {
-            const newState = {
-                ...prev,
-                [quadrant]: [...prev[quadrant], value]
-            };
-            return newState;
-        });
-
+        const newState = {
+            ...swotData,
+            [quadrant]: [...swotData[quadrant], value]
+        };
+        
+        setSwotData(newState);
         setInputs(prev => ({ ...prev, [quadrant]: '' }));
+
+        if (socket && !isRemoteUpdate.current) {
+            socket.emit('swot-change', { meetingId, state: newState });
+            
+            // Immediate save to Redis to ensure persistence even if meeting ends soon
+            fetch('/api/brainstorming/swotAnalysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, state: newState })
+            }).catch(() => {});
+        }
     };
 
     const handleRemovePoint = (quadrant: SWOTQuadrant, index: number) => {
         if (readOnly) return;
-        setSwotData(prev => {
-            const newState = {
-                ...prev,
-                [quadrant]: prev[quadrant].filter((_, i) => i !== index)
-            };
-            return newState;
-        });
+        const newState = {
+            ...swotData,
+            [quadrant]: swotData[quadrant].filter((_, i) => i !== index)
+        };
+        setSwotData(newState);
+
+        if (socket && !isRemoteUpdate.current) {
+            socket.emit('swot-change', { meetingId, state: newState });
+            
+            // Immediate save to Redis
+            fetch('/api/brainstorming/swotAnalysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, state: newState })
+            }).catch(() => {});
+        }
     };
+
+    // Receive update
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('swot-update', ({ state, senderId }) => {
+            if (senderId === socket.id) return;
+            performRemoteAction(() => {
+                // Merge states instead of full overwrite to be safer
+                setSwotData(prev => {
+                    // Simple merge strategy: combine unique items from both states
+                    // This is better than full overwrite in a chaotic multi-user setting
+                    const merged = { ...prev };
+                    Object.keys(state).forEach((key) => {
+                        const q = key as SWOTQuadrant;
+                        const remoteItems = state[q] || [];
+                        const localItems = prev[q] || [];
+                        // Union of both arrays (removing obvious duplicates)
+                        merged[q] = [...new Set([...localItems, ...remoteItems])];
+                    });
+                    return merged;
+                });
+            });
+        });
+        return () => { socket.off('swot-update'); };
+    }, [socket, performRemoteAction]);
+
+    // DB Persistence
+    useEffect(() => {
+        const timeout = setTimeout(async () => {
+            if (!isLoaded || readOnly || !meetingId) return;
+            try {
+                await fetch('/api/brainstorming/swotAnalysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, state: swotData })
+                });
+                await fetch('/api/brainstorming/swotAnalysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: swotData })
+                });
+            } catch (err) {}
+        }, 5000);
+        return () => clearTimeout(timeout);
+    }, [swotData, meetingId, isLoaded, readOnly]);
 
     const quadrantConfig: Record<SWOTQuadrant, { title: string, color: string, lightColor: string, bulletColor: string }> = {
         strengths: { title: "Strengths", color: "text-emerald-400", lightColor: "bg-emerald-500/10 border-emerald-500/20", bulletColor: "bg-emerald-500" },
@@ -175,72 +239,6 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
                     );
                 })}
             </div>
-
-            {!readOnly && (
-                <SwotLiveKitSync 
-                    swotData={swotData} 
-                    meetingId={meetingId} 
-                    onRemoteUpdate={setSwotData}
-                />
-            )}
         </div>
     );
-}
-
-interface SyncProps {
-    swotData: SWOTState;
-    meetingId: string;
-    onRemoteUpdate: (state: SWOTState) => void;
-}
-
-function SwotLiveKitSync({ swotData, meetingId, onRemoteUpdate }: SyncProps) {
-    const { localParticipant } = useLocalParticipant();
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Broadcast update
-    useEffect(() => {
-        if (!localParticipant || !meetingId) return;
-
-        // Sync to Redis/DB (Debounced)
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(async () => {
-            // Sync to LiveKit
-            try {
-                const payloadBytes = new TextEncoder().encode(JSON.stringify(swotData));
-                localParticipant.publishData(payloadBytes, { topic: 'swot-update' }).catch(() => {});
-            } catch (e) {}
-
-            try {
-                // Save to Redis Live Cache
-                await fetch('/api/brainstorming/swotAnalysis', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, state: swotData })
-                });
-
-                // Save to MongoDB Persistence
-                await fetch('/api/brainstorming/swotAnalysis', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: swotData })
-                });
-            } catch (err) {}
-        }, 1000);
-
-        return () => {
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, [swotData, localParticipant, meetingId]);
-
-    // Receive update
-    useDataChannel('swot-update', (msg) => {
-        if (!msg.payload) return;
-        try {
-            const payloadStr = new TextDecoder().decode(msg.payload);
-            const newState = JSON.parse(payloadStr);
-            onRemoteUpdate(newState);
-        } catch(e) {}
-    });
-
-    return null;
 }

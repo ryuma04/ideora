@@ -5,10 +5,12 @@ import ReactFlow, {
     Background, Controls, MiniMap,
     useNodesState, useEdgesState, addEdge,
     Connection, Edge, Node, BackgroundVariant,
-    useReactFlow, ReactFlowProvider
+    useReactFlow, ReactFlowProvider,
+    applyNodeChanges, applyEdgeChanges,
+    NodeChange, EdgeChange
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useLocalParticipant, useDataChannel } from "@livekit/components-react";
+import { useSocketSync } from "@/hooks/useSocketSync";
 import StickyNoteNode from "./StickyNoteNode";
 
 const STICKY_COLORS = [
@@ -26,30 +28,60 @@ interface StickyNotesProps {
 }
 
 function StickyNotesContent({ meetingId, readOnly = false, initialData }: StickyNotesProps) {
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [nodes, setNodes] = useNodesState([]);
+    const [edges, setEdges] = useEdgesState([]);
     const [isLoaded, setIsLoaded] = useState(false);
     const { fitView } = useReactFlow();
+    const { socket, isRemoteUpdate, performRemoteAction } = useSocketSync(meetingId);
+    const socketRef = useRef<any>(null);
+
+    useEffect(() => {
+        socketRef.current = socket;
+    }, [socket]);
+
+    // Track versions for LWW (Last Writer Wins)
+    const nodeVersions = useRef<Record<string, number>>({});
 
     const nodeTypes = useMemo(() => ({
         sticky: StickyNoteNode,
     }), []);
 
-    const handleNodeChange = useCallback((id: string, newLabel: string) => {
-        if (readOnly) return;
+    // Helper to update node data with versioning
+    const updateNodeWithVersion = useCallback((id: string, dataUpdate: any) => {
+        const timestamp = Date.now();
+        nodeVersions.current[id] = timestamp;
+        
         setNodes((nds) =>
             nds.map((node) => {
                 if (node.id === id) {
-                    return { ...node, data: { ...node.data, label: newLabel } };
+                    return { ...node, data: { ...node.data, ...dataUpdate, version: timestamp } };
                 }
                 return node;
             })
         );
-    }, [setNodes, readOnly]);
+
+        if (socketRef.current && !isRemoteUpdate.current) {
+            socketRef.current.emit('sticky-notes-change', { 
+                meetingId,
+                type: 'nodes',
+                changes: [{
+                    id,
+                    type: 'replace',
+                    item: { id, data: { ...dataUpdate, version: timestamp } }
+                }]
+            });
+        }
+    }, [setNodes, meetingId, isRemoteUpdate]);
+
+    const handleNodeChange = useCallback((id: string, newLabel: string) => {
+        if (readOnly) return;
+        updateNodeWithVersion(id, { label: newLabel });
+    }, [readOnly, updateNodeWithVersion]);
 
     const addStickyNote = useCallback((colorObj: any) => {
         if (readOnly) return;
         const newNodeId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const timestamp = Date.now();
         
         const randomOffsetX = (Math.random() - 0.5) * 80;
         const randomOffsetY = (Math.random() - 0.5) * 80;
@@ -62,23 +94,135 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                 label: '', 
                 color: colorObj.hex, 
                 borderColor: colorObj.border,
-                onChange: handleNodeChange 
+                onChange: handleNodeChange,
+                version: timestamp
             },
         };
 
         setNodes((nds) => [...nds, newNode]);
-    }, [setNodes, handleNodeChange, readOnly]);
+        nodeVersions.current[newNodeId] = timestamp;
 
-    // DB Sync Initialization
+        if (socketRef.current && !isRemoteUpdate.current) {
+            socketRef.current.emit('sticky-notes-change', { meetingId, type: 'nodes', changes: [{ type: 'add', item: newNode }] });
+        }
+    }, [setNodes, handleNodeChange, readOnly, meetingId, isRemoteUpdate]);
+
+    // React Flow Change Handlers
+    const onNodesChangeLocal = useCallback((changes: NodeChange[]) => {
+        if (readOnly) return;
+        setNodes((nds) => applyNodeChanges(changes, nds));
+        if (socketRef.current && !isRemoteUpdate.current) {
+            socketRef.current.emit('sticky-notes-change', { meetingId, changes, type: 'nodes' });
+        }
+    }, [readOnly, setNodes, meetingId, isRemoteUpdate]);
+
+    const onEdgesChangeLocal = useCallback((changes: EdgeChange[]) => {
+        if (readOnly) return;
+        setEdges((eds) => applyEdgeChanges(changes, eds));
+        if (socketRef.current && !isRemoteUpdate.current) {
+            socketRef.current.emit('sticky-notes-change', { meetingId, changes, type: 'edges' });
+        }
+    }, [readOnly, setEdges, meetingId, isRemoteUpdate]);
+
+    const onConnectLocal = useCallback((params: Edge | Connection) => {
+        if (readOnly) return;
+        const newEdge = { ...params, animated: false, style: { stroke: '#94a3b8', strokeWidth: 3, strokeDasharray: '5,5' } };
+        setEdges((eds) => {
+             const updatedEdges = addEdge(newEdge, eds);
+             if (socketRef.current && !isRemoteUpdate.current) {
+                socketRef.current.emit('sticky-notes-change', { 
+                    meetingId, 
+                    type: 'edges', 
+                    changes: [{ type: 'add', item: updatedEdges[updatedEdges.length - 1] }] 
+                });
+             }
+             return updatedEdges;
+        });
+    }, [setEdges, meetingId, isRemoteUpdate, readOnly]);
+
+    // Socket listeners
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on('sticky-notes-update', ({ changes, type, senderId }) => {
+            if (senderId === socket.id) return;
+
+            performRemoteAction(() => {
+                if (type === 'nodes') {
+                    setNodes((nds) => {
+                        // 1. Filter out 'add' changes for nodes that already exist
+                        const uniqueChanges = changes.filter((change: any) => {
+                            if (change.type === 'add' && nds.some(n => n.id === change.item.id)) {
+                                return false;
+                            }
+                            return true;
+                        });
+
+                        // 2. Conflict Resolution: Only apply if version is newer
+                        const filteredChanges = uniqueChanges.filter((change: any) => {
+                            if (change.type === 'replace' || (change.item && change.item.data && change.item.data.version)) {
+                                const id = change.id || change.item.id;
+                                const incomingVersion = change.item?.data?.version || 0;
+                                const localVersion = nodeVersions.current[id] || 0;
+                                if (incomingVersion <= localVersion && localVersion !== 0) return false;
+                                if (incomingVersion > 0) nodeVersions.current[id] = incomingVersion;
+                            }
+                            return true;
+                        });
+
+                        const updated = applyNodeChanges(filteredChanges, nds);
+                        
+                        // 3. Manually apply 'replace' (data/text) changes since applyNodeChanges ignores them
+                        let finalNodes = updated;
+                        filteredChanges.forEach((change: any) => {
+                            if (change.type === 'replace' && change.item) {
+                                finalNodes = finalNodes.map(n => {
+                                    if (n.id === change.item.id) {
+                                        return { ...n, data: { ...n.data, ...change.item.data } };
+                                    }
+                                    return n;
+                                });
+                            }
+                        });
+
+                        return finalNodes.map(n => ({
+                            ...n,
+                            data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                        }));
+                    });
+                } else if (type === 'edges') {
+                    setEdges((eds) => {
+                        // Filter out 'add' changes for edges that already exist
+                        const uniqueChanges = changes.filter((change: any) => {
+                            if (change.type === 'add' && eds.some(e => e.id === change.item.id)) {
+                                return false;
+                            }
+                            return true;
+                        });
+                        return applyEdgeChanges(uniqueChanges, eds);
+                    });
+                }
+            });
+        });
+
+        return () => {
+            socket.off('sticky-notes-update');
+        };
+    }, [socket, performRemoteAction, setNodes, setEdges, handleNodeChange, readOnly]);
+
+    // Initialization
     useEffect(() => {
         if (initialData) {
             try {
                 const parsed = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
                 if (parsed.nodes && parsed.edges) {
-                    const loadedNodes = parsed.nodes.map((n: Node) => ({
-                        ...n,
-                        data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
-                    }));
+                    const loadedNodes = parsed.nodes.map((n: Node) => {
+                        if (n.data?.version) nodeVersions.current[n.id] = n.data.version;
+                        return {
+                            ...n,
+                            data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                        };
+                    });
                     setNodes(loadedNodes);
                     setEdges(parsed.edges);
                 }
@@ -93,10 +237,13 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
             .then(res => res.json())
             .then(data => {
                 if (data.state && Array.isArray(data.state.nodes) && Array.isArray(data.state.edges)) {
-                    const loadedNodes = data.state.nodes.map((n: Node) => ({
-                        ...n,
-                        data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
-                    }));
+                    const loadedNodes = data.state.nodes.map((n: Node) => {
+                        if (n.data?.version) nodeVersions.current[n.id] = n.data.version;
+                        return {
+                            ...n,
+                            data: { ...n.data, onChange: readOnly ? undefined : handleNodeChange }
+                        };
+                    });
                     setNodes(loadedNodes);
                     setEdges(data.state.edges);
                 }
@@ -108,16 +255,37 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
             });
     }, [meetingId, handleNodeChange, setNodes, setEdges, readOnly, initialData]);
 
-    // Auto-fit when loaded or in read-only mode periodic fit
+    // DB Persistence logic
+    useEffect(() => {
+        const timeout = setTimeout(async () => {
+            if (!isLoaded || readOnly) return;
+            
+            const cleanNodes = nodes.map(n => ({...n, data: { ...n.data, onChange: undefined }}));
+            const stateToSave = { nodes: cleanNodes, edges };
+
+            try {
+                await fetch('/api/brainstorming/stickyNotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, state: stateToSave })
+                });
+                await fetch('/api/brainstorming/stickyNotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: stateToSave })
+                });
+            } catch (err) {}
+        }, 5000);
+
+        return () => clearTimeout(timeout);
+    }, [nodes, edges, isLoaded, readOnly, meetingId]);
+
+    // Auto-fit
     useEffect(() => {
         if (isLoaded && readOnly) {
             fitView({ padding: 0.2, duration: 800 });
         }
     }, [isLoaded, readOnly, fitView, nodes.length]);
-
-    const onConnect = useCallback((params: Edge | Connection) => {
-        setEdges((eds) => addEdge({...params, animated: false, style: { stroke: '#94a3b8', strokeWidth: 3, strokeDasharray: '5,5' } }, eds));
-    }, [setEdges]);
 
     if (!isLoaded) return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white">Loading Notes...</div>;
 
@@ -152,9 +320,9 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
-                onNodesChange={readOnly ? undefined : onNodesChange}
-                onEdgesChange={readOnly ? undefined : onEdgesChange}
-                onConnect={readOnly ? undefined : onConnect}
+                onNodesChange={onNodesChangeLocal}
+                onEdgesChange={onEdgesChangeLocal}
+                onConnect={onConnectLocal}
                 nodeTypes={nodeTypes}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
@@ -188,23 +356,6 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                 </div>
             </div>
              )}
-
-            {!readOnly && (
-                <StickyNotesLiveKitSync 
-                    nodes={nodes} 
-                    edges={edges} 
-                    meetingId={meetingId} 
-                    isLoaded={isLoaded}
-                    onRemoteUpdate={(incoming) => {
-                        const restoredNodes = incoming.nodes.map((n: any) => ({
-                            ...n,
-                            data: { ...n.data, onChange: handleNodeChange }
-                        }));
-                        setNodes(restoredNodes);
-                        setEdges(incoming.edges);
-                    }}
-                />
-            )}
         </div>
     );
 }
@@ -217,65 +368,3 @@ export default function BrainstormingStickyNotes(props: StickyNotesProps) {
     );
 }
 
-interface SyncProps {
-    nodes: Node[];
-    edges: Edge[];
-    meetingId: string;
-    isLoaded: boolean;
-    onRemoteUpdate: (state: any) => void;
-}
-
-function StickyNotesLiveKitSync({ nodes, edges, meetingId, isLoaded, onRemoteUpdate }: SyncProps) {
-    const { localParticipant } = useLocalParticipant();
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Broadcast Changes
-    useEffect(() => {
-        if (!isLoaded || !localParticipant) return;
-        
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-
-        saveTimeoutRef.current = setTimeout(async () => {
-            const cleanNodes = nodes.map(n => ({...n, data: { ...n.data, onChange: undefined }}));
-            const stateToSave = { nodes: cleanNodes, edges };
-            
-            try {
-                const payloadStr = JSON.stringify(stateToSave);
-                const payloadBytes = new TextEncoder().encode(payloadStr);
-                localParticipant.publishData(payloadBytes, { topic: 'stickynotes-reactflow' }).catch(() => {});
-            } catch (e) {}
-
-            try {
-                await fetch('/api/brainstorming/stickyNotes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, state: stateToSave })
-                });
-                await fetch('/api/brainstorming/stickyNotes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: stateToSave })
-                });
-            } catch (err) {}
-        }, 1000);
-
-        return () => {
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        };
-    }, [nodes, edges, meetingId, localParticipant, isLoaded]);
-
-    // Receive Changes
-    useDataChannel('stickynotes-reactflow', (msg) => {
-        try {
-            const payloadStr = new TextDecoder().decode(msg.payload);
-            const incomingState = JSON.parse(payloadStr);
-            if (incomingState.nodes && incomingState.edges) {
-                onRemoteUpdate(incomingState);
-            }
-        } catch (err) {}
-    });
-
-    return null;
-}

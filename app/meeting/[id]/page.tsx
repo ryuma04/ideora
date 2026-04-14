@@ -18,7 +18,7 @@ import dynamic from "next/dynamic";
 import BrainstormingSwotAnalysis from '@/app/brainstorming/brainstormingSwotAnalysis';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
-const BrainstormingCanvas = dynamic(() => import('@/app/brainstorming/brainstormingCanvas'), {
+const BrainstormingCanvas = dynamic(() => import('@/app/brainstorming/brainstormingCanvas').then(mod => mod.default), {
     ssr: false,
     loading: () => (
         <div className="w-full h-full flex items-center justify-center flex-col animate-pulse bg-slate-800 rounded-xl border border-slate-700">
@@ -28,7 +28,7 @@ const BrainstormingCanvas = dynamic(() => import('@/app/brainstorming/brainstorm
     )
 });
 
-const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brainstormingMindmapping'), {
+const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brainstormingMindmapping').then(mod => mod.default), {
     ssr: false,
     loading: () => (
         <div className="w-full h-full flex items-center justify-center flex-col animate-pulse bg-slate-800 rounded-xl border border-slate-700">
@@ -38,7 +38,7 @@ const BrainstormingMindmapping = dynamic(() => import('@/app/brainstorming/brain
     )
 });
 
-const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brainstormingStickyNotes'), {
+const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brainstormingStickyNotes').then(mod => mod.default), {
     ssr: false,
     loading: () => (
         <div className="w-full h-full flex items-center justify-center flex-col animate-pulse bg-slate-800 rounded-xl border border-slate-700">
