@@ -5,7 +5,7 @@ export function proxy(request: NextRequest) {
     
     // Define public vs protected paths
     const isPublicPath = path.startsWith('/auth');
-    const isProtectedPath = path.startsWith('/dashboard') || path.startsWith('/meeting');
+    const isProtectedPath = path.startsWith('/dashboard') || path.startsWith('/meeting/createMeeting');
 
     const token = request.cookies.get("token")?.value;
 
