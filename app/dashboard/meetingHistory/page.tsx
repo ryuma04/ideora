@@ -34,6 +34,32 @@ export default function MeetingHistory() {
         }
     };
 
+    const handleShareMeeting = (e: React.MouseEvent, meeting: any) => {
+        e.stopPropagation();
+        const origin = window.location.origin;
+        const meetingLink = `${origin}/meeting/${meeting._id}`;
+        
+        const dateStr = meeting.status === 'upcoming' 
+            ? new Date(meeting.startTime).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : new Date(meeting.createdAt).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        const inviteText = `Join Meeting: ${meeting.title}\n`
+            + `Host: ${meeting.host || 'Unknown'}\n`
+            + `Description: ${meeting.description || 'No description provided'}\n`
+            + `Date & Time: ${dateStr}\n`
+            + `Meeting Link: ${meetingLink}\n`
+            + `Meeting Code: ${meeting.meetingCode}`;
+
+        navigator.clipboard.writeText(inviteText)
+            .then(() => {
+                alert("Meeting invitation copied to clipboard!");
+            })
+            .catch(err => {
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy invitation");
+            });
+    };
+
     useEffect(() => {
         const getData = async () => {
             try {
@@ -223,9 +249,18 @@ export default function MeetingHistory() {
                                             </button>
                                         )}
                                         {meeting.status !== 'ended' && meeting.status !== 'cancelled' && (
-                                            <button className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20 active:scale-95">
-                                                Join Now
-                                            </button>
+                                            <>
+                                                <button 
+                                                    onClick={(e) => handleShareMeeting(e, meeting)}
+                                                    className="px-5 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 hover:border-indigo-300 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                                    Share Meeting
+                                                </button>
+                                                <button className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20 active:scale-95">
+                                                    Join Now
+                                                </button>
+                                            </>
                                         )}
                                     </div>
 

@@ -15,7 +15,33 @@ export default function Dashboard() {
         isWaitingRoomEnabled: false
     });
     const [loading, setLoading] = useState(false);
+    const [meetings, setMeetings] = useState<any[]>([]);
 
+    const handleShareMeeting = (e: React.MouseEvent, meeting: any) => {
+        e.stopPropagation();
+        const origin = window.location.origin;
+        const meetingLink = `${origin}/meeting/${meeting._id}`;
+        
+        const dateStr = meeting.status === 'upcoming' 
+            ? new Date(meeting.startTime).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : new Date(meeting.createdAt).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        const inviteText = `Join Meeting: ${meeting.title}\n`
+            + `Host: ${meeting.host || 'Unknown'}\n`
+            + `Description: ${meeting.description || 'No description provided'}\n`
+            + `Date & Time: ${dateStr}\n`
+            + `Meeting Link: ${meetingLink}\n`
+            + `Meeting Code: ${meeting.meetingCode}`;
+
+        navigator.clipboard.writeText(inviteText)
+            .then(() => {
+                alert("Meeting invitation copied to clipboard!");
+            })
+            .catch(err => {
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy invitation");
+            });
+    };
 
     const handleScheduleMeeting = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -50,6 +76,13 @@ export default function Dashboard() {
             if (data.success) {
                 setIsScheduleModalOpen(false);
                 setScheduleData({ title: '', description: '', date: '', time: '', isWaitingRoomEnabled: false });
+                
+                // Refresh the meetings list
+                const meetingRes = await fetch('/api/meeting/list');
+                const meetingData = await meetingRes.json();
+                if (meetingData.success) {
+                    setMeetings(meetingData.meetings.filter((m: any) => m.status === 'upcoming' || m.status === 'active'));
+                }
             } else {
                 alert(data.error || "Failed to schedule meeting");
             }
@@ -76,6 +109,13 @@ export default function Dashboard() {
                         username: data.data.username,
                         profileImage: data.data.profileImage
                     });
+                }
+
+                // Fetch meetings
+                const meetingRes = await fetch('/api/meeting/list');
+                const meetingData = await meetingRes.json();
+                if (meetingData.success) {
+                    setMeetings(meetingData.meetings.filter((m: any) => m.status === 'upcoming' || m.status === 'active'));
                 }
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
@@ -243,6 +283,69 @@ export default function Dashboard() {
                             </button>
                         </div>
                     </div>
+
+                    {meetings.length > 0 && (
+                        <div className="mt-12">
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">Upcoming Meetings</h2>
+                            <div className="space-y-4">
+                                {meetings.map((meeting: any) => (
+                                    <div
+                                        key={meeting._id}
+                                        onClick={() => router.push(`/meeting/${meeting._id}`)}
+                                        className="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all shadow-sm cursor-pointer hover:border-indigo-300 hover:shadow-md"
+                                    >
+                                        <div className="flex items-center gap-4 sm:gap-5">
+                                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center font-bold text-xl sm:text-2xl shadow-sm shrink-0 bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                {meeting.title.charAt(0).toUpperCase()}
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] sm:text-xs text-slate-500 font-bold mb-1 truncate">
+                                                    <span className="text-indigo-600">
+                                                        Scheduled: {new Date(meeting.startTime).toLocaleString(undefined, {
+                                                            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                        })}
+                                                    </span>
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h3 className="text-base sm:text-lg font-bold truncate text-slate-900">{meeting.title}</h3>
+                                                    <div className="flex gap-1.5 shrink-0">
+                                                        <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full border ${meeting.myRole === 'host'
+                                                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm shadow-indigo-500/10'
+                                                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                                                            }`}>
+                                                            {meeting.myRole}
+                                                        </span>
+                                                        <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full border ${meeting.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-500/10' :
+                                                            'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-500/10'
+                                                            }`}>
+                                                            {meeting.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 mt-1.5 inline-block font-mono font-bold tracking-wider">
+                                                    CODE: {meeting.meetingCode}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2 self-end sm:self-center">
+                                            <button 
+                                                onClick={(e) => handleShareMeeting(e, meeting)}
+                                                className="px-5 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 hover:border-indigo-300 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                                Share Meeting
+                                            </button>
+                                            <button className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20 active:scale-95">
+                                                Join Now
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
             {/* Schedule Meeting Modal */}

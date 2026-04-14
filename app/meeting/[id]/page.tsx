@@ -122,6 +122,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
     const router = useRouter();
     const roomState = useConnectionState();
     const { localParticipant } = useLocalParticipant();
+    const [isEnding, setIsEnding] = useState(false);
 
     // Get all video tracks (camera + screen share)
     const tracks = useTracks(
@@ -165,6 +166,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
     // ─── Meeting End Logic ──────────────────────────────────────────
     const handleEndMeeting = async () => {
         if (meetingEndedRef.current) return;
+        setIsEnding(true);
 
         try {
             console.log("Attempting to end meeting with ID:", meetingId);
@@ -451,8 +453,15 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
     return (
         <div className="flex flex-col h-screen bg-[#FAFAFA] text-slate-900 font-sans relative">
+            {isEnding && (
+                <div className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                    <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                    <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Finalizing Session...</h2>
+                    <p className="text-slate-300 font-medium text-center px-4 max-w-md">Please wait while we secure your meeting records and generate minutes.</p>
+                </div>
+            )}
             {/* Header */}
-            <header className="px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
+            <header className="meeting-header meeting-header-inner px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -506,11 +515,11 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
             {/* Main Content Area with Sidebar */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Video Grid */}
-                <main className={`flex-1 overflow-hidden transition-all duration-300 ${isBrainstormingMode ? 'p-2' : 'p-6'} ${showParticipants ? 'mr-0' : ''}`}>
+                <main className={`mobile-compact-padding flex-1 overflow-hidden transition-all duration-300 ${isBrainstormingMode ? 'p-2' : 'p-6'} ${showParticipants ? 'mr-0' : ''}`}>
                     {isBrainstormingMode ? (
-                        <div className="flex h-full gap-2 relative">
+                        <div className="brainstorm-layout flex h-full gap-2 relative">
                             {/* Workspace Sidebar Tools (Absolute positioning so it floats over canvas if necessary or sits beside) */}
-                            <div className="w-16 flex flex-col items-center py-4 bg-slate-800 rounded-xl border border-slate-700 shadow-xl gap-4 z-20 shrink-0">
+                            <div className="brainstorm-tool-sidebar w-16 flex flex-col items-center py-4 bg-slate-800 rounded-xl border border-slate-700 shadow-xl gap-4 z-20 shrink-0">
                                 <button
                                     onClick={() => setActiveWorkspaceTool('whiteboard')}
                                     className={`p-3 rounded-lg transition-all ${activeWorkspaceTool === 'whiteboard' ? 'bg-yellow-500/20 text-yellow-400' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
@@ -542,7 +551,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                             </div>
 
                             {/* 1. Primary Canvas Area (Flex 1 ensures it fills remaining space besides the toolbar and PiP) */}
-                            <div className="flex-1 bg-slate-800/80 rounded-xl flex items-center justify-center overflow-hidden relative shadow-lg">
+                            <div className="brainstorm-canvas-area flex-1 bg-slate-800/80 rounded-xl flex items-center justify-center overflow-hidden relative shadow-lg">
                                 {activeWorkspaceTool === 'whiteboard' && <BrainstormingCanvas meetingId={meetingId} />}
                                 {activeWorkspaceTool === 'swot' && <BrainstormingSwotAnalysis meetingId={meetingId} />}
                                 {activeWorkspaceTool === 'mindmap' && <BrainstormingMindmapping meetingId={meetingId} />}
@@ -550,7 +559,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                             </div>
 
                             {/* 2. PiP Video Column (less width) */}
-                            <div className="w-48 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1">
+                            <div className="brainstorm-pip-column w-48 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1">
                                 {tracks.map((trackRef) => (
                                     <div key={`${trackRef.participant.sid}-${trackRef.source}`} className="h-32 shrink-0">
                                         <VideoTile trackRef={trackRef} />
@@ -569,7 +578,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                                     <p>Waiting for others to join...</p>
                                 </div>
                             ) : (
-                                <div className={`grid gap-4 w-full h-full ${tracks.length === 1 ? 'grid-cols-1' :
+                                <div className={`meeting-video-grid-2 grid gap-4 w-full h-full ${tracks.length === 1 ? 'grid-cols-1' :
                                     tracks.length === 2 ? 'grid-cols-2' :
                                         'grid-cols-2 md:grid-cols-3'
                                     }`}>
@@ -587,7 +596,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
                 {/* Sidebar (Participants & Chat) */}
                 {showParticipants && (
-                    <aside className="w-80 bg-white/80 backdrop-blur-xl border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-300">
+                    <aside className="participant-sidebar meeting-sidebar-panel w-80 bg-white/80 backdrop-blur-xl border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-300">
 
                         {/* Tabs Header */}
                         <div className="flex items-center border-b border-slate-200">
@@ -736,8 +745,8 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
             </div>
 
             {/* Premium Control Bar */}
-            <footer className={`${isBrainstormingMode ? 'h-20 pb-2' : 'h-24 pb-4'} bg-white/90 backdrop-blur-xl border-t border-slate-200 flex items-center justify-center gap-8 transition-all duration-300`}>
-                <div className={`flex items-center gap-6 bg-slate-50 ${isBrainstormingMode ? 'px-6 py-2' : 'px-8 py-4'} rounded-2xl border border-slate-200 shadow-lg transition-all duration-300`}>
+            <footer className={`meeting-footer ${isBrainstormingMode ? 'h-20 pb-2' : 'h-24 pb-4'} bg-white/90 backdrop-blur-xl border-t border-slate-200 flex items-center justify-center gap-8 transition-all duration-300`}>
+                <div className={`meeting-controls-bar flex items-center gap-6 bg-slate-50 ${isBrainstormingMode ? 'px-6 py-2' : 'px-8 py-4'} rounded-2xl border border-slate-200 shadow-lg transition-all duration-300`}>
                     <button
                         onClick={toggleMic}
                         className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${micOn
@@ -842,7 +851,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                             className="px-8 py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/30"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            End Meeting
+                            <span className="meeting-end-btn-text">End Meeting</span>
                         </button>
                     ) : (
                         <button
@@ -850,7 +859,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                             className="px-8 py-4 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-sm"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                            Leave
+                            <span className="meeting-end-btn-text">Leave</span>
                         </button>
                     )}
                 </div>
@@ -1016,10 +1025,10 @@ export default function MeetingRoom() {
                         </p>
                     </div>
                     <button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push(isGuest ? '/' : '/dashboard')}
                         className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
                     >
-                        Back to Dashboard
+                        {isGuest ? 'Return Home' : 'Back to Dashboard'}
                     </button>
                 </div>
             </div>
@@ -1036,10 +1045,10 @@ export default function MeetingRoom() {
                     <h2 className="text-2xl font-bold mb-2">Unavailable</h2>
                     <p className="text-slate-400 mb-6">{error}</p>
                     <button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push(isGuest ? '/' : '/dashboard')}
                         className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
                     >
-                        Back to Dashboard
+                        {isGuest ? 'Return Home' : 'Back to Dashboard'}
                     </button>
                 </div>
             </div>

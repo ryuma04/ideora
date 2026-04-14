@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
 
@@ -7,6 +7,13 @@ export default function JoinMeeting() {
     const router = useRouter();
     const [meetingCode, setMeetingCode] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isAuth, setIsAuth] = useState(false);
+
+    useEffect(() => {
+        fetch('/api/dashboard/profile')
+            .then(res => setIsAuth(res.ok))
+            .catch(() => setIsAuth(false));
+    }, []);
 
     const joinMeeting = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,13 +95,13 @@ export default function JoinMeeting() {
                             <div className="text-center pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => router.push('/dashboard')}
+                                    onClick={() => router.push(isAuth ? '/dashboard' : '/')}
                                     className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2 mx-auto group/back"
                                 >
                                     <svg className="w-4 h-4 group-hover/back:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                     </svg>
-                                    Return to Dashboard
+                                    {isAuth ? 'Return to Dashboard' : 'Return to Home'}
                                 </button>
                             </div>
                         </form>
