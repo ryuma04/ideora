@@ -1025,10 +1025,10 @@ export default function MeetingRoom() {
                         </p>
                     </div>
                     <button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push(isGuest ? '/' : '/dashboard')}
                         className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
                     >
-                        Back to Dashboard
+                        {isGuest ? 'Return Home' : 'Back to Dashboard'}
                     </button>
                 </div>
             </div>
@@ -1045,10 +1045,10 @@ export default function MeetingRoom() {
                     <h2 className="text-2xl font-bold mb-2">Unavailable</h2>
                     <p className="text-slate-400 mb-6">{error}</p>
                     <button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push(isGuest ? '/' : '/dashboard')}
                         className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
                     >
-                        Back to Dashboard
+                        {isGuest ? 'Return Home' : 'Back to Dashboard'}
                     </button>
                 </div>
             </div>
