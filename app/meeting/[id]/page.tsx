@@ -122,6 +122,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
     const router = useRouter();
     const roomState = useConnectionState();
     const { localParticipant } = useLocalParticipant();
+    const [isEnding, setIsEnding] = useState(false);
 
     // Get all video tracks (camera + screen share)
     const tracks = useTracks(
@@ -165,6 +166,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
     // ─── Meeting End Logic ──────────────────────────────────────────
     const handleEndMeeting = async () => {
         if (meetingEndedRef.current) return;
+        setIsEnding(true);
 
         try {
             console.log("Attempting to end meeting with ID:", meetingId);
@@ -451,6 +453,13 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
     return (
         <div className="flex flex-col h-screen bg-[#FAFAFA] text-slate-900 font-sans relative">
+            {isEnding && (
+                <div className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                    <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                    <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Finalizing Session...</h2>
+                    <p className="text-slate-300 font-medium text-center px-4 max-w-md">Please wait while we secure your meeting records and generate minutes.</p>
+                </div>
+            )}
             {/* Header */}
             <header className="meeting-header meeting-header-inner px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
                 <div className="flex items-center gap-6">
