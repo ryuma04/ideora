@@ -50,7 +50,7 @@ const BrainstormingStickyNotes = dynamic(() => import('@/app/brainstorming/brain
 
 // Video Component to render a participant
 function VideoTile({ trackRef }: { trackRef: any }) {
-    const { publication, participant } = trackRef;
+    const { publication, participant, source } = trackRef;
     // Safely check for publication
     const isVideoMuted = publication?.isMuted ?? true; // Assume muted if unsure
 
@@ -77,7 +77,7 @@ function VideoTile({ trackRef }: { trackRef: any }) {
                             publication.track.attach(el);
                         }
                     }}
-                    className="w-full h-full object-cover transform scale-x-[-1]" // Mirror local video
+                    className={`w-full h-full ${source === Track.Source.ScreenShare ? 'object-contain bg-black' : 'object-cover'} ${participant.isLocal && source === Track.Source.Camera ? 'transform scale-x-[-1]' : ''}`}
                 />
             ) : (
                 // Avatar View
