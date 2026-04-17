@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-
 export function useSocketSync(meetingId: string) {
     const [socket, setSocket] = useState<Socket | null>(null);
     const isRemoteUpdate = useRef(false);
@@ -10,7 +8,14 @@ export function useSocketSync(meetingId: string) {
     useEffect(() => {
         if (!meetingId) return;
 
-        const newSocket = io(SOCKET_URL, {
+        let socketUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!socketUrl && process.env.NEXT_PUBLIC_API_URL) {
+            socketUrl = process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '');
+        } else if (!socketUrl) {
+            socketUrl = 'https://ideora-backend.onrender.com';
+        }
+
+        const newSocket = io(socketUrl, {
             withCredentials: true,
             transports: ['websocket'], // Prefer websockets for speed
         });
