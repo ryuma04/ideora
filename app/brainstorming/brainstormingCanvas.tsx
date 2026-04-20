@@ -72,9 +72,46 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
             .catch(err => console.error("Initial fetch error:", err));
     }, [meetingId, excalidrawAPI, propInitialData, readOnly]);
 
+    // ──────────────────────────────────────────────────────────────────
+    //  Debounced persistence – saves to Redis AND MongoDB
+    //  Triggered by onChange (via broadcastChanges) so it reacts to
+    //  every real drawing interaction instead of running only once.
+    // ──────────────────────────────────────────────────────────────────
+    const saveInProgress = useRef(false);
+    const saveToDB = useRef(
+        throttle(async (api: any, mid: string) => {
+            if (saveInProgress.current) return;
+            saveInProgress.current = true;
+            try {
+                const allElements = api.getSceneElements();
+                if (!allElements || allElements.length === 0) return;
+
+                const payloadState = { elements: allElements };
+
+                // Save to Redis (live cache)
+                await fetch('/api/brainstorming/canvas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId: mid, state: payloadState })
+                });
+
+                // Save to MongoDB (persistent)
+                await fetch('/api/brainstorming/canvas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId: mid, action: 'save_to_db', state: payloadState })
+                });
+            } catch (err) {
+                console.warn('[canvas] Save failed:', err);
+            } finally {
+                saveInProgress.current = false;
+            }
+        }, 5000, { leading: false, trailing: true }) // save at most once every 5 seconds
+    ).current;
+
     // Throttled Broadcast Function
     const broadcastChanges = useRef(
-        throttle((elements: readonly any[]) => {
+        throttle((elements: readonly any[], meetingIdInner: string, api: any) => {
             if (!socketRef.current || isRemoteUpdate.current) return;
 
             // Only send changed elements based on version
@@ -84,7 +121,7 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
             });
 
             if (changedElements.length > 0) {
-                socketRef.current.emit('canvas-change', { meetingId, elements: changedElements });
+                socketRef.current.emit('canvas-change', { meetingId: meetingIdInner, elements: changedElements });
                 
                 // Update tracker
                 changedElements.forEach(el => {
@@ -95,20 +132,23 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
                         lastElementsRef.current.push({ id: el.id, version: el.version });
                     }
                 });
+
+                // Trigger persistence on every meaningful change
+                if (api) saveToDB(api, meetingIdInner);
             }
         }, 100) // 100ms throttle for smoothness vs payload balance
     ).current;
 
     const onChange = useCallback((elements: readonly any[], appState: any) => {
         if (readOnly) return;
-        broadcastChanges(elements);
-    }, [readOnly, broadcastChanges]);
+        broadcastChanges(elements, meetingId, excalidrawAPI);
+    }, [readOnly, broadcastChanges, meetingId, excalidrawAPI]);
 
     // Receive Changes
     useEffect(() => {
         if (!socket || !excalidrawAPI) return;
 
-        socket.on('canvas-update', ({ elements, senderId }) => {
+        socket.on('canvas-update', ({ elements, senderId }: any) => {
             if (senderId === socket.id) return;
 
             performRemoteAction(() => {
@@ -141,35 +181,12 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
         };
     }, [socket, excalidrawAPI, performRemoteAction]);
 
-    // DB Persistence logic (Debounced)
+    // Flush any pending save when component unmounts
     useEffect(() => {
-        const timeout = setTimeout(async () => {
-            if (!excalidrawAPI || readOnly) return;
-            
-            const allElements = excalidrawAPI.getSceneElements();
-            if (!allElements || allElements.length === 0) return;
-            
-            const payloadState = { elements: allElements, appState: excalidrawAPI.getAppState() };
-
-            try {
-                // Save to Redis (Live cache)
-                await fetch('/api/brainstorming/canvas', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, state: payloadState })
-                });
-
-                // Save to DB (Persistent storage)
-                await fetch('/api/brainstorming/canvas', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId, action: 'save_to_db', state: payloadState })
-                });
-            } catch (err) { }
-        }, 5000); // Save every 5 seconds (Reduced from 10s for better reliability)
-
-        return () => clearTimeout(timeout);
-    }, [excalidrawAPI, meetingId, readOnly]);
+        return () => {
+            saveToDB.flush();
+        };
+    }, [saveToDB]);
 
     return (
         <div className="w-full h-full relative">
