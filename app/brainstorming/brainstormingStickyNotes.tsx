@@ -332,7 +332,7 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                 elementsSelectable={!readOnly}
             >
                 <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" className="hidden sm:block" />
-                {!readOnly && <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />}
+                {!readOnly && <Controls className="bg-slate-700 border-slate-600 fill-white text-white hidden sm:block" />}
                 {!readOnly && (
                     <MiniMap 
                         nodeStrokeColor={(n) => '#94a3b8'}

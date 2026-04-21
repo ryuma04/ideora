@@ -346,7 +346,7 @@ function MindmapContent({ meetingId, readOnly = false, initialData }: MindmapPro
                 elementsSelectable={!readOnly}
             >
                 <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#334155" className="hidden sm:block" />
-                {!readOnly && <Controls className="bg-slate-800 border-slate-700 fill-white text-white" />}
+                {!readOnly && <Controls className="bg-slate-800 border-slate-700 fill-white text-white hidden sm:block" />}
                 {!readOnly && (
                     <MiniMap 
                         nodeStrokeColor={() => '#2dd4bf'}
