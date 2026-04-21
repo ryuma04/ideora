@@ -331,14 +331,14 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                 nodesConnectable={!readOnly}
                 elementsSelectable={!readOnly}
             >
-                <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" />
+                <Background variant={BackgroundVariant.Cross} gap={24} size={2} color="#475569" className="hidden sm:block" />
                 {!readOnly && <Controls className="bg-slate-700 border-slate-600 fill-white text-white" />}
                 {!readOnly && (
                     <MiniMap 
                         nodeStrokeColor={(n) => '#94a3b8'}
                         nodeColor={getNodeColor}
                         maskColor="rgba(0, 0, 0, 0.4)"
-                        className="bg-slate-700"
+                        className="bg-slate-700 hidden sm:block"
                     />
                 )}
             </ReactFlow>

@@ -345,14 +345,14 @@ function MindmapContent({ meetingId, readOnly = false, initialData }: MindmapPro
                 nodesConnectable={!readOnly}
                 elementsSelectable={!readOnly}
             >
-                <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#334155" />
+                <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#334155" className="hidden sm:block" />
                 {!readOnly && <Controls className="bg-slate-800 border-slate-700 fill-white text-white" />}
                 {!readOnly && (
                     <MiniMap 
                         nodeStrokeColor={() => '#2dd4bf'}
                         nodeColor={() => '#1e293b'}
                         maskColor="rgba(0, 0, 0, 0.5)"
-                        className="bg-slate-800"
+                        className="bg-slate-800 hidden sm:block"
                     />
                 )}
             </ReactFlow>
