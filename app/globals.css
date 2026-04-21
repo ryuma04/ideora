@@ -13,6 +13,7 @@
   
   --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
   --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 1.2s ease-in-out infinite;
 
   @keyframes fade-in-up {
     from {
@@ -33,6 +34,17 @@
       transform: translateY(-10px);
     }
   }
+
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scaleY(0.6);
+    }
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -49,182 +61,184 @@ body {
 }
 
 /* ========================================
-   MOBILE RESPONSIVE MEDIA QUERIES
+   MODERN RESPONSIVE DESIGN SYSTEM (IDEORA)
    ======================================== */
 
-/* --- Small mobile devices (max-width: 480px) --- */
-@media (max-width: 480px) {
-  /* Meeting room header: stack elements vertically */
+/* --- Level 1: Mobile Devices (max-width: 640px) --- */
+@media (max-width: 640px) {
+  /* Header: Stack title and status, hide invite text */
   .meeting-header-inner {
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-  }
-
-  /* Meeting control bar: shrink buttons */
-  .meeting-controls-bar {
-    gap: 0.25rem !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
     padding: 0.5rem 0.75rem !important;
   }
 
+  .meeting-header-inner .flex.items-center.gap-6 {
+    gap: 0.5rem !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .meeting-header-inner .flex.items-center.gap-3:last-child {
+    width: 100% !important;
+    justify-content: center !important;
+    gap: 0.75rem !important;
+  }
+
+  .meeting-header-timer svg,
+  .h-8.w-px.bg-slate-700\/50 {
+    display: none !important;
+  }
+
+  /* Control Bar: Ultra-compact bottom toolbar */
+  .meeting-footer {
+    height: auto !important;
+    padding: 0.5rem !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+
+  .meeting-controls-bar {
+    gap: 0.35rem !important;
+    padding: 0.4rem 0.5rem !important;
+    border-radius: 1rem !important;
+    width: 100% !important;
+    justify-content: space-evenly !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
   .meeting-controls-bar button {
-    padding: 0.625rem !important;
+    padding: 0.5rem !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    border-radius: 0.75rem !important;
   }
 
   .meeting-controls-bar button svg {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
   }
 
-  /* Hide text labels in meeting controls on very small screens */
-  .meeting-end-btn-text {
-    display: none;
+  /* Text hiding logic */
+  .meeting-end-btn-text,
+  .recording-btn-text,
+  .invite-btn-text {
+    display: none !important;
   }
 
-  /* Brainstorming tool sidebar: horizontal on extremely small screens */
-  .brainstorm-tool-sidebar {
-    padding: 0.25rem !important;
+  /* Video / Avatar Scaling */
+  .video-avatar-container {
+    width: 4rem !important;
+    height: 4rem !important;
   }
 }
 
-/* --- Standard mobile devices (max-width: 640px) --- */
-@media (max-width: 640px) {
-  /* Brainstorming layout - Priority to Canvas */
-  .brainstorm-layout {
-    flex-direction: column !important;
-  }
-  
-  .brainstorm-canvas-area {
-    min-height: unset !important;
-    height: 100% !important;
-    flex: 1 1 auto !important;
+/* --- Level 2: Tablet / Standard Mobile (641px - 1024px) --- */
+@media (max-width: 1024px) {
+  /* Control Bar: Compact mode (Hide most labels) */
+  .meeting-end-btn-text,
+  .recording-btn-text {
+    display: none !important;
   }
 
-  /* Horizontal toolbar at the top of the brainstorming wrapper */
+  .meeting-controls-bar {
+    gap: 0.75rem !important;
+    padding: 0.5rem 1rem !important;
+  }
+
+  .meeting-controls-bar button {
+    padding: 0.6rem !important;
+  }
+
+  /* Brainstorming Sidebar: Percentage based */
+  .participant-sidebar {
+    width: 250px !important;
+  }
+
+  /* Brainstorming layouts */
+  .brainstorm-layout {
+    flex-direction: column !important;
+    padding-bottom: 5rem !important; /* Safety buffer for mobile footer */
+  }
+
+  /* Reposition palette to bottom on mobile */
+  .sticky-notes-palette {
+    position: absolute !important;
+    left: 50% !important;
+    bottom: 1rem !important;
+    top: auto !important;
+    transform: translateX(-50%) !important;
+    flex-direction: row !important;
+    width: auto !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 1.5rem !important;
+    z-index: 40 !important;
+  }
+
   .brainstorm-tool-sidebar {
     flex-direction: row !important;
     width: 100% !important;
     height: auto !important;
     padding: 0.5rem !important;
-    gap: 0.5rem !important;
     justify-content: center !important;
+    gap: 1.5rem !important;
+    border-radius: 1rem !important;
   }
 
-  /* Floating, compact PiP videos over the canvas so they don't consume layout space */
-  .brainstorm-pip-column {
-    position: absolute !important;
-    bottom: 0.5rem !important;
-    right: 0.5rem !important;
+  .brainstorm-canvas-area {
+    min-height: 480px !important;
     height: auto !important;
-    width: auto !important;
-    flex-direction: row !important;
-    gap: 0.25rem !important;
-    z-index: 40 !important;
-    background: transparent !important;
+    flex: none !important;
   }
 
-  .brainstorm-pip-column > div {
-    width: 4.5rem !important;
-    height: 3.5rem !important;
-    flex-shrink: 0 !important;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  /* Hide instructions to save space */
+  .sticky-notes-instructions {
+    display: none !important;
   }
 }
 
-/* --- Standard mobile devices (max-width: 640px) --- */
-@media (max-width: 640px) {
-  /* Landing page hero text sizing */
-  .hero-trust-badges {
-    flex-direction: column;
-    gap: 0.5rem;
+/* --- Level 3: Small Tablets / Large Mobile (481px - 768px) --- */
+@media (max-width: 768px) {
+  .meeting-video-grid-2 {
+    grid-template-columns: 1fr !important;
   }
+  
+  .meeting-video-grid-3, .meeting-video-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
 
-  /* Meeting room: sidebar takes full width on mobile when open */
+/* --- Specific Element Overrides --- */
+
+.video-avatar-container {
+  width: 8rem;
+  height: 8rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-sidebar-panel {
+  transition: transform 0.3s ease;
+}
+
+@media (max-width: 640px) {
   .meeting-sidebar-panel {
     position: fixed !important;
     inset: 0 !important;
     width: 100% !important;
-    z-index: 50 !important;
-    border-left: none !important;
+    z-index: 100 !important;
+    transform: translateY(100%);
   }
-
-  /* Meeting room footer controls */
-  .meeting-footer {
-    height: auto !important;
-    padding: 0.5rem 0 !important;
-  }
-
-  /* Reduce padding on content areas */
-  .mobile-compact-padding {
-    padding: 0.75rem !important;
+  .meeting-sidebar-panel.open {
+    transform: translateY(0);
   }
 }
 
-/* --- Tablets and smaller (max-width: 768px) --- */
-@media (max-width: 768px) {
-  /* Meeting room header: tighter layout */
-  .meeting-header {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    padding-top: 0.625rem;
-    padding-bottom: 0.625rem;
-  }
-
-  /* Adjust meeting video grid for single column on tablets */
-  .meeting-video-grid-2 {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Participant sidebar: narrower on tablet */
-  .participant-sidebar {
-    width: 260px !important;
-  }
+/* Custom Scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-/* --- Ensure touch targets are adequate on mobile --- */
-@media (max-width: 768px) {
-  button, 
-  a,
-  [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  /* Exception for inline text buttons, tags, and badges */
-  span[class*="text-[9px]"],
-  span[class*="text-[10px]"] {
-    min-height: auto;
-    min-width: auto;
-  }
-}
-
-/* --- Safe area insets for notched phones --- */
-@supports (padding: env(safe-area-inset-bottom)) {
-  @media (max-width: 640px) {
-    .meeting-footer {
-      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)) !important;
-    }
-  }
-}
-
-/* --- Prevent horizontal overflow globally on mobile --- */
-@media (max-width: 768px) {
-  html, body {
-    overflow-x: hidden;
-  }
-}
-
-/* --- Custom scrollbar for mobile (thin) --- */
-@media (max-width: 768px) {
-  ::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.3);
-    border-radius: 10px;
-  }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

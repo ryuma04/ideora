@@ -300,18 +300,18 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
         <div className="w-full h-full relative bg-slate-800 overflow-hidden text-slate-900">
             {/* Custom Control Palette Overlay */}
             {!readOnly && (
-                <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-4 bg-slate-800/95 backdrop-blur-xl p-4 rounded-[24px] border border-slate-700 shadow-2xl">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight">
+                <div className="sticky-notes-palette absolute left-6 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-4 bg-slate-800/95 backdrop-blur-xl p-4 rounded-[24px] border border-slate-700 shadow-2xl">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center leading-tight hidden sm:block">
                         Add<br/>Note
                     </p>
                     {STICKY_COLORS.map((colorObj) => (
                         <button
                             key={colorObj.name}
                             onClick={() => addStickyNote(colorObj)}
-                            className={`w-12 h-12 rounded-xl border-t-[6px] ${colorObj.hex} ${colorObj.border} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 opacity-90 hover:opacity-100 flex items-center justify-center group`}
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-t-[4px] sm:border-t-[6px] ${colorObj.hex} ${colorObj.border} shadow-lg transform transition-all duration-200 hover:scale-110 hover:-translate-y-1 opacity-90 hover:opacity-100 flex items-center justify-center group`}
                             title={`Add ${colorObj.name} note`}
                         >
-                            <svg className="w-6 h-6 text-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4"/></svg>
                         </button>
                     ))}
                 </div>
@@ -345,7 +345,7 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
 
              {/* Instructions Overlay */}
              {!readOnly && (
-                 <div className="absolute bottom-6 left-28 z-10 bg-slate-800/90 backdrop-blur-xl px-5 py-4 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl">
+                 <div className="sticky-notes-instructions absolute bottom-6 left-28 z-10 bg-slate-800/90 backdrop-blur-xl px-5 py-4 rounded-xl border border-slate-700 text-xs text-slate-300 pointer-events-none shadow-2xl hidden md:block">
                 <p className="font-bold text-white mb-2 flex items-center gap-2 text-sm border-b border-slate-700 pb-2">
                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                    Sticky Notes Wall

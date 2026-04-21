@@ -82,27 +82,33 @@ function VideoTile({ trackRef }: { trackRef: any }) {
             ) : (
                 // Avatar View
                 <div className="flex flex-col items-center justify-center w-full h-full bg-slate-50">
-                    {metadata.profileImage ? (
-                        <img
-                            src={metadata.profileImage}
-                            alt={participant.identity}
-                            className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md"
-                        />
-                    ) : (
-                        <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold text-white shadow-md border-4 border-white">
-                            {participant.identity?.slice(0, 2).toUpperCase() || "??"}
-                        </div>
-                    )}
+                    <div className="video-avatar-container flex items-center justify-center rounded-full bg-indigo-600 shadow-md border-4 border-white overflow-hidden">
+                        {metadata.profileImage ? (
+                            <img
+                                src={metadata.profileImage}
+                                alt={participant.identity}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <span className="text-3xl sm:text-4xl font-bold text-white">
+                                {participant.identity?.slice(0, 2).toUpperCase() || "??"}
+                            </span>
+                        )}
+                    </div>
                 </div>
             )}
 
             {/* Name Tag */}
-            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-800 shadow-sm border border-slate-200 flex items-center gap-2">
-                <span>{participant.identity}</span>
+            <div className="absolute bottom-4 left-4 bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-800 shadow-xl border border-white/50 flex items-center gap-2 group-hover:bg-white/90 transition-all duration-300">
+                <span className="tracking-tight">{participant.identity}</span>
                 {participant.isMicrophoneEnabled ? (
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <div className="flex gap-0.5">
+                        <div className="w-1 h-3 bg-green-500 rounded-full animate-pulse-slow"></div>
+                        <div className="w-1 h-3 bg-green-500 rounded-full animate-pulse-slow delay-75"></div>
+                        <div className="w-1 h-3 bg-green-500 rounded-full animate-pulse-slow delay-150"></div>
+                    </div>
                 ) : (
-                    <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
+                    <svg className="w-4 h-4 text-red-500 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
                 )}
             </div>
         </div>
@@ -470,9 +476,12 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                         <div>
                             <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">{title || `Meeting: ${meetingId}`}</h1>
                             <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${roomState === ConnectionState.Connected ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></span>
-                                <span className="text-xs text-slate-400 font-medium">
-                                    {roomState === ConnectionState.Connected ? 'Live' : 'Connecting...'}
+                                <div className="relative flex items-center justify-center">
+                                    <span className={`absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75 ${roomState === ConnectionState.Connected ? '' : 'hidden'}`}></span>
+                                    <span className={`relative w-2 h-2 rounded-full ${roomState === ConnectionState.Connected ? 'bg-green-500' : 'bg-slate-400'}`}></span>
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${roomState === ConnectionState.Connected ? 'text-green-600' : 'text-slate-400'}`}>
+                                    {roomState === ConnectionState.Connected ? 'Live Session' : 'Connecting'}
                                 </span>
                             </div>
                         </div>
@@ -481,9 +490,9 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                     <div className="h-8 w-px bg-slate-700/50 hidden md:block"></div>
 
                     {/* Timer Display */}
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm ${secondsLeft < 300 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-200 text-slate-600'} transition-colors duration-300`}>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span className="font-mono font-bold text-sm tracking-wider">
+                    <div className={`meeting-header-timer flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-inner ${secondsLeft < 300 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-slate-100/50 border-slate-200 text-slate-600'} transition-all duration-500`}>
+                        <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="font-mono font-bold text-xs tracking-[0.2em]">
                             {formatTime(secondsLeft)}
                         </span>
                     </div>
@@ -492,22 +501,25 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleCopy}
-                        className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors border border-slate-600 flex items-center gap-2"
+                        className="px-3 sm:px-4 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors border border-slate-600 flex items-center gap-2"
                     >
                         {copied ? (
                             <>
                                 <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                Copied!
+                                <span className="invite-btn-text hidden lg:inline">Copied!</span>
+                                <span className="lg:hidden">✓</span>
                             </>
                         ) : (
                             <>
                                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                                Copy Invite
+                                <span className="invite-btn-text hidden lg:inline">Copy Invite</span>
+                                <span className="lg:hidden">Invite</span>
                             </>
                         )}
                     </button>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold border-2 border-slate-800">
-                        You
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] sm:text-sm font-bold border-2 border-slate-800 shadow-md">
+                        <span className="hidden sm:inline">You</span>
+                        <span className="sm:hidden">U</span>
                     </div>
                 </div>
             </header>
@@ -515,7 +527,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
             {/* Main Content Area with Sidebar */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Video Grid */}
-                <main className={`mobile-compact-padding flex-1 overflow-hidden transition-all duration-300 ${isBrainstormingMode ? 'p-2' : 'p-6'} ${showParticipants ? 'mr-0' : ''}`}>
+                <main className={`mobile-compact-padding flex-1 ${isBrainstormingMode ? 'overflow-y-auto' : 'overflow-hidden'} transition-all duration-300 ${isBrainstormingMode ? 'p-2' : 'p-6'} ${showParticipants ? 'mr-0' : ''}`}>
                     {isBrainstormingMode ? (
                         <div className="brainstorm-layout flex h-full gap-2 relative">
                             {/* Workspace Sidebar Tools (Absolute positioning so it floats over canvas if necessary or sits beside) */}
@@ -596,7 +608,7 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
 
                 {/* Sidebar (Participants & Chat) */}
                 {showParticipants && (
-                    <aside className="participant-sidebar meeting-sidebar-panel w-80 bg-white/80 backdrop-blur-xl border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-300">
+                    <aside className={`participant-sidebar meeting-sidebar-panel ${showParticipants ? 'open' : ''} w-80 bg-white/80 backdrop-blur-xl border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-300`}>
 
                         {/* Tabs Header */}
                         <div className="flex items-center border-b border-slate-200">
@@ -745,101 +757,103 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
             </div>
 
             {/* Premium Control Bar */}
-            <footer className={`meeting-footer ${isBrainstormingMode ? 'h-20 pb-2' : 'h-24 pb-4'} bg-white/90 backdrop-blur-xl border-t border-slate-200 flex items-center justify-center gap-8 transition-all duration-300`}>
-                <div className={`meeting-controls-bar flex items-center gap-6 bg-slate-50 ${isBrainstormingMode ? 'px-6 py-2' : 'px-8 py-4'} rounded-2xl border border-slate-200 shadow-lg transition-all duration-300`}>
+            <footer className={`meeting-footer ${isBrainstormingMode ? 'h-16 sm:h-20 pb-2' : 'h-20 sm:h-24 pb-4'} bg-white/90 backdrop-blur-xl border-t border-slate-200 flex items-center justify-center transition-all duration-300 w-full`}>
+                <div className={`meeting-controls-bar flex items-center gap-2 sm:gap-6 bg-slate-50 ${isBrainstormingMode ? 'px-4 py-1.5' : 'px-6 py-3'} sm:px-8 sm:py-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-lg transition-all duration-300 max-w-[95vw] overflow-x-auto no-scrollbar`}>
                     <button
                         onClick={toggleMic}
-                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${micOn
+                        className={`p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${micOn
                             ? 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                             }`}
+                        title="Toggle Microphone"
                     >
                         {micOn ? (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                         ) : (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
                         )}
                     </button>
 
                     <button
                         onClick={toggleCamera}
-                        className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${camOn
+                        className={`p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${camOn
                             ? 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                             }`}
+                        title="Toggle Camera"
                     >
                         {camOn ? (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                         ) : (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" /></svg>
                         )}
                     </button>
 
-                    {/* Screen Share Button - Hide for Guests */}
                     {!isGuest && (
                         <button
                             onClick={toggleScreenShare}
-                            className={`p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${screenShareOn
+                            className={`p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${screenShareOn
                                 ? 'bg-indigo-600 text-white border-transparent hover:bg-indigo-500 shadow-indigo-500/30'
                                 : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                                 }`}
                             title="Share Screen"
                         >
                             {screenShareOn ? (
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                             ) : (
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                             )}
                         </button>
                     )}
 
-                    {/* Participants Toggle Button */}
                     <button
                         onClick={() => setShowParticipants(!showParticipants)}
-                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${showParticipants
+                        className={`relative p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${showParticipants
                             ? 'bg-indigo-50 text-indigo-600 border-indigo-200 ring-2 ring-inset ring-indigo-500'
                             : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             }`}
                         title="Participants"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                         <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-white text-[10px] font-bold">
                             {participants.length}
                         </span>
                     </button>
 
-                    {/* Recording Indicator (Host Only) */}
                     {isHost && (
                         <button
                             onClick={() => audioContextState === 'suspended' ? startRecording() : null}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300 ${isRecording && audioContextState === 'running'
-                                ? 'bg-red-50 border-red-200 text-red-600 animate-pulse'
-                                : 'bg-slate-100 border-slate-200 text-slate-500'
+                            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg border transition-all duration-500 relative group overflow-hidden ${isRecording && audioContextState === 'running'
+                                ? 'bg-red-50/80 border-red-200 text-red-600 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                                : 'bg-slate-100/80 border-slate-200 text-slate-500'
                                 }`}
                             title={audioContextState === 'suspended' ? 'Click to enable recording' : 'Recording Status'}
                         >
-                            <div className={`w-2 h-2 rounded-full ${isRecording && audioContextState === 'running' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider">
-                                {isRecording && audioContextState === 'running' ? 'REC' : audioContextState === 'suspended' ? 'REC (Paused)' : 'REC (Standby)'}
+                            <div className="relative">
+                                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isRecording && audioContextState === 'running' ? 'bg-red-500 animate-ping opacity-75' : 'bg-slate-400'}`}></div>
+                                <div className={`absolute inset-0 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isRecording && audioContextState === 'running' ? 'bg-red-500' : 'bg-slate-400'}`}></div>
+                            </div>
+                            <span className="recording-btn-text text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] whitespace-nowrap">
+                                {isRecording && audioContextState === 'running' ? 'REC' : audioContextState === 'suspended' ? 'PAUSED' : 'READY'}
                             </span>
                         </button>
                     )}
 
                     <button
                         onClick={() => setIsBrainstormingMode(!isBrainstormingMode)}
-                        className={`relative p-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${isBrainstormingMode
+                        className={`relative p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm border ${isBrainstormingMode
                             ? 'bg-yellow-50 text-yellow-600 border-yellow-200 ring-2 ring-inset ring-yellow-500'
                             : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
                             }`}
                         title="Brainstorming Mode"
                     >
-                        {/* brainstorming icon bulb */}
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                        <span className="absolute -top-1 -right-2 flex h-4 px-1.5 min-w-[20px] items-center justify-center rounded-full bg-yellow-500 text-[10px] text-white font-bold">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                        <span className="absolute -top-1 -right-2 flex h-4 px-1 sm:px-1.5 min-w-[16px] sm:min-w-[20px] items-center justify-center rounded-full bg-yellow-500 text-[9px] sm:text-[10px] text-white font-bold uppercase">
                             {isBrainstormingMode ? 'On' : 'Off'}
                         </span>
                     </button>
-                    <div className="w-px h-10 bg-slate-200 mx-2"></div>
+
+                    <div className="w-px h-6 sm:h-10 bg-slate-200 mx-1 sm:mx-2 shrink-0"></div>
 
                     {isHost ? (
                         <button
@@ -848,18 +862,18 @@ function MeetingContent({ meetingId, meetingDbId, title, isGuest, isHost, partic
                                     handleEndMeeting();
                                 }
                             }}
-                            className="px-8 py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/30"
+                            className="px-3 sm:px-6 lg:px-8 py-3 sm:py-4 bg-red-600 hover:bg-red-700 rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 sm:gap-3 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/30 text-white whitespace-nowrap min-w-[48px]"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            <span className="meeting-end-btn-text">End Meeting</span>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            <span className="meeting-end-btn-text hidden lg:inline text-sm sm:text-base">End Meeting</span>
                         </button>
                     ) : (
                         <button
                             onClick={handleLeaveMeeting}
-                            className="px-8 py-4 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold flex items-center gap-3 transition-all duration-200 transform hover:scale-105 shadow-sm"
+                            className="px-3 sm:px-6 lg:px-8 py-3 sm:py-4 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 sm:gap-3 transition-all duration-200 transform hover:scale-105 shadow-sm whitespace-nowrap min-w-[48px]"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                            <span className="meeting-end-btn-text">Leave</span>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                            <span className="meeting-end-btn-text hidden lg:inline text-sm sm:text-base">Leave</span>
                         </button>
                     )}
                 </div>

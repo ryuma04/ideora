@@ -163,17 +163,17 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
 
     return (
         <div className="w-full h-full p-4 flex flex-col bg-slate-800 rounded-xl overflow-hidden shadow-inner">
-            <div className="mb-4 px-2 flex items-center justify-between">
+            <div className="mb-2 sm:mb-4 px-1 sm:px-2 flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
                         <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        SWOT Analysis
+                        SWOT
                     </h2>
-                    <p className="text-xs text-slate-400 mt-1">Identify core strengths, weaknesses, opportunities, and threats.</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">Core strategy analysis.</p>
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-4 min-h-0">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 min-h-0 overflow-y-auto sm:overflow-hidden">
                 {(Object.keys(quadrantConfig) as SWOTQuadrant[]).map(quadrant => {
                     const config = quadrantConfig[quadrant];
                     return (

@@ -5,7 +5,7 @@ export default memo(function MindmapNode({ id, data, isConnectable }: any) {
     const bgColor = data.color || 'bg-blue-500';
 
     return (
-        <div className={`relative px-4 py-3 shadow-xl rounded-xl ${bgColor} text-white min-w-[200px] flex items-center justify-center border-2 border-white/20 transition-all hover:shadow-2xl`}>
+        <div className={`relative px-2 sm:px-4 py-2 sm:py-3 shadow-xl rounded-xl ${bgColor} text-white min-w-[150px] sm:min-w-[200px] flex items-center justify-center border-2 border-white/20 transition-all hover:shadow-2xl`}>
              <Handle type="target" position={Position.Left} isConnectable={isConnectable} className="w-3 h-3 bg-white border-2 border-slate-800" />
              <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="w-3 h-3 bg-white border-2 border-slate-800" />
              
