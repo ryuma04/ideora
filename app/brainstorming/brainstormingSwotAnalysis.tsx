@@ -28,6 +28,12 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
     const [isLoaded, setIsLoaded] = useState(false);
     const { socket, isRemoteUpdate, performRemoteAction } = useSocketSync(meetingId);
 
+    // Refs for save-on-unmount
+    const swotDataRef = useRef(swotData);
+    const isLoadedRef = useRef(isLoaded);
+    useEffect(() => { swotDataRef.current = swotData; }, [swotData]);
+    useEffect(() => { isLoadedRef.current = isLoaded; }, [isLoaded]);
+
     const [inputs, setInputs] = useState({
         strengths: '',
         weaknesses: '',
@@ -153,6 +159,19 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
         }, 5000);
         return () => clearTimeout(timeout);
     }, [swotData, meetingId, isLoaded, readOnly]);
+
+    // Save immediately on unmount (prevents data loss when switching tools)
+    useEffect(() => {
+        return () => {
+            if (!isLoadedRef.current || readOnly || !meetingId) return;
+            fetch('/api/brainstorming/swotAnalysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, state: swotDataRef.current })
+            }).catch(() => {});
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [meetingId, readOnly]);
 
     const quadrantConfig: Record<SWOTQuadrant, { title: string, color: string, lightColor: string, bulletColor: string }> = {
         strengths: { title: "Strengths", color: "text-emerald-400", lightColor: "bg-emerald-500/10 border-emerald-500/20", bulletColor: "bg-emerald-500" },

@@ -42,6 +42,14 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
     // Track versions for LWW (Last Writer Wins)
     const nodeVersions = useRef<Record<string, number>>({});
 
+    // Refs to track latest state for save-on-unmount
+    const nodesRef = useRef(nodes);
+    const edgesRef = useRef(edges);
+    const isLoadedRef = useRef(isLoaded);
+    useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+    useEffect(() => { edgesRef.current = edges; }, [edges]);
+    useEffect(() => { isLoadedRef.current = isLoaded; }, [isLoaded]);
+
     const nodeTypes = useMemo(() => ({
         sticky: StickyNoteNode,
     }), []);
@@ -279,6 +287,21 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
 
         return () => clearTimeout(timeout);
     }, [nodes, edges, isLoaded, readOnly, meetingId]);
+
+    // Save immediately on unmount (prevents data loss when switching tools)
+    useEffect(() => {
+        return () => {
+            if (!isLoadedRef.current || readOnly) return;
+            const cleanNodes = nodesRef.current.map((n: any) => ({ ...n, data: { ...n.data, onChange: undefined } }));
+            const stateToSave = { nodes: cleanNodes, edges: edgesRef.current };
+            fetch('/api/brainstorming/stickyNotes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, state: stateToSave })
+            }).catch(() => {});
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [meetingId, readOnly]);
 
     // Auto-fit
     useEffect(() => {
