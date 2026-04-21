@@ -73,40 +73,53 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
     }, [meetingId, excalidrawAPI, propInitialData, readOnly]);
 
     // ──────────────────────────────────────────────────────────────────
-    //  Debounced persistence – saves to Redis AND MongoDB
-    //  Triggered by onChange (via broadcastChanges) so it reacts to
-    //  every real drawing interaction instead of running only once.
+    //  Debounced persistence – split into Redis (fast) and MongoDB (slow)
+    //  Triggered by onChange (via broadcastChanges)
     // ──────────────────────────────────────────────────────────────────
-    const saveInProgress = useRef(false);
-    const saveToDB = useRef(
+    const redisSaveInProgress = useRef(false);
+    const saveToRedis = useRef(
         throttle(async (api: any, mid: string) => {
-            if (saveInProgress.current) return;
-            saveInProgress.current = true;
+            if (redisSaveInProgress.current) return;
+            redisSaveInProgress.current = true;
             try {
                 const allElements = api.getSceneElements();
                 if (!allElements || allElements.length === 0) return;
-
-                const payloadState = { elements: allElements };
 
                 // Save to Redis (live cache)
                 await fetch('/api/brainstorming/canvas', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId: mid, state: payloadState })
+                    body: JSON.stringify({ meetingId: mid, state: { elements: allElements } })
                 });
+            } catch (err) {
+                console.warn('[canvas] Redis save failed:', err);
+            } finally {
+                redisSaveInProgress.current = false;
+            }
+        }, 2000, { leading: false, trailing: true }) // save to Redis every 2 seconds
+    ).current;
+
+    const mongoSaveInProgress = useRef(false);
+    const saveToMongo = useRef(
+        throttle(async (api: any, mid: string) => {
+            if (mongoSaveInProgress.current) return;
+            mongoSaveInProgress.current = true;
+            try {
+                const allElements = api.getSceneElements();
+                if (!allElements || allElements.length === 0) return;
 
                 // Save to MongoDB (persistent)
                 await fetch('/api/brainstorming/canvas', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meetingId: mid, action: 'save_to_db', state: payloadState })
+                    body: JSON.stringify({ meetingId: mid, action: 'save_to_db', state: { elements: allElements } })
                 });
             } catch (err) {
-                console.warn('[canvas] Save failed:', err);
+                console.warn('[canvas] Mongo save failed:', err);
             } finally {
-                saveInProgress.current = false;
+                mongoSaveInProgress.current = false;
             }
-        }, 5000, { leading: false, trailing: true }) // save at most once every 5 seconds
+        }, 15000, { leading: false, trailing: true }) // save to Mongo every 15 seconds
     ).current;
 
     // Throttled Broadcast Function
@@ -134,7 +147,10 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
                 });
 
                 // Trigger persistence on every meaningful change
-                if (api) saveToDB(api, meetingIdInner);
+                if (api) {
+                    saveToRedis(api, meetingIdInner);
+                    saveToMongo(api, meetingIdInner);
+                }
             }
         }, 100) // 100ms throttle for smoothness vs payload balance
     ).current;
@@ -184,9 +200,10 @@ export default function BrainstormingCanvas({ meetingId, readOnly = false, initi
     // Flush any pending save when component unmounts
     useEffect(() => {
         return () => {
-            saveToDB.flush();
+            saveToRedis.flush();
+            saveToMongo.flush();
         };
-    }, [saveToDB]);
+    }, [saveToRedis, saveToMongo]);
 
     return (
         <div className="w-full h-full relative">
