@@ -49,6 +49,14 @@ function MindmapContent({ meetingId, readOnly = false, initialData }: MindmapPro
     // Track versions for LWW (Last Writer Wins)
     const nodeVersions = useRef<Record<string, number>>({});
 
+    // Refs to track latest state for save-on-unmount
+    const nodesRef = useRef(nodes);
+    const edgesRef = useRef(edges);
+    const isLoadedRef = useRef(isLoaded);
+    useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+    useEffect(() => { edgesRef.current = edges; }, [edges]);
+    useEffect(() => { isLoadedRef.current = isLoaded; }, [isLoaded]);
+
     const nodeTypes = useMemo(() => ({
         mindmap: MindmapNode,
     }), []);
@@ -314,10 +322,25 @@ function MindmapContent({ meetingId, readOnly = false, initialData }: MindmapPro
                     body: JSON.stringify({ meetingId, action: 'save_to_db', state: stateToSave })
                 });
             } catch (err) {}
-        }, 5000); // Save every 5 seconds if changed
+        }, 5000);
 
         return () => clearTimeout(timeout);
     }, [nodes, edges, isLoaded, readOnly, meetingId]);
+
+    // Save immediately on unmount (prevents data loss when switching tools)
+    useEffect(() => {
+        return () => {
+            if (!isLoadedRef.current || readOnly) return;
+            const cleanNodes = nodesRef.current.map((n: any) => ({ ...n, data: { ...n.data, onBranch: undefined, onChange: undefined } }));
+            const stateToSave = { nodes: cleanNodes, edges: edgesRef.current };
+            fetch('/api/brainstorming/mindmapping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, state: stateToSave })
+            }).catch(() => {});
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [meetingId, readOnly]);
 
     // Auto-fit when loaded or in read-only mode periodic fit
     useEffect(() => {
