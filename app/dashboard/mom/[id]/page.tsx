@@ -77,47 +77,48 @@ export default function MoMViewer() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans h-screen overflow-hidden">
-            <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm shrink-0">
-                <div className="flex items-center gap-6">
+            <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between sticky top-0 z-50 shadow-sm shrink-0 gap-4 sm:gap-0">
+                <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
                     <button
                         onClick={() => router.push('/dashboard/mom')}
-                        className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center"
+                        className="p-2 sm:p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center shrink-0"
                         title="Back to MoM List"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </button>
-                    <div className="h-10 w-px bg-slate-200"></div>
-                    <div>
-                        <div className="flex items-center gap-3 mb-0.5">
-                            <span className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow-sm">AI Generated MoM</span>
-                            <h1 className="text-xl font-black text-slate-900 truncate max-w-md">{mom.title}</h1>
+                    <div className="h-8 sm:h-10 w-px bg-slate-200"></div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-0.5 min-w-0">
+                            <span className="bg-indigo-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow-sm self-start">AI Generated MoM</span>
+                            <h1 className="text-base sm:text-xl font-black text-slate-900 truncate max-w-full sm:max-w-md leading-tight">{mom.title}</h1>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium">
+                        <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">
                             {new Date(mom.endedAt).toLocaleDateString(undefined, {
-                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                                year: 'numeric', month: 'short', day: 'numeric',
                                 hour: '2-digit', minute: '2-digit'
-                            })} • Host: {mom.host?.username || "Unknown"}
+                            })} • {mom.host?.username || "Unknown"}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
                     <button
                         onClick={handleDownload}
-                        className="px-6 py-2.5 bg-slate-900 font-bold text-white rounded-xl shadow-lg hover:bg-indigo-600 transition-all flex items-center gap-2 transform hover:-translate-y-0.5"
+                        className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 bg-slate-900 font-bold text-white rounded-xl shadow-lg hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5 text-xs sm:text-sm"
                     >
-                        <span>Download PDF</span>
+                        <span className="hidden xs:inline">Download PDF</span>
+                        <span className="xs:hidden">Download</span>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     </button>
-                    <div className="h-10 w-px bg-slate-200 mx-1"></div>
-                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                        <span className="px-3 py-1.5 text-[10px] font-bold text-indigo-700 uppercase tracking-tighter">Verified Official</span>
+                    <div className="hidden sm:block h-10 w-px bg-slate-200 mx-1"></div>
+                    <div className="flex bg-slate-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200 shrink-0">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-tighter">Verified Official</span>
                     </div>
                 </div>
             </header>
 
-            <main className="flex-1 w-full flex flex-col items-center bg-slate-800 p-4 md:p-8 overflow-y-auto">
-                <div className="w-full max-w-5xl h-full bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-slate-700/50 flex flex-col">
+            <main className="flex-1 w-full flex flex-col items-center bg-slate-800 p-2 sm:p-4 md:p-8 overflow-y-auto">
+                <div className="w-full max-w-5xl h-full min-h-[500px] bg-white rounded-2xl shadow-2xl overflow-hidden border-2 sm:border-4 border-slate-700/50 flex flex-col transition-all duration-300">
                     <iframe 
                         src={previewUrl}
                         className="w-full h-full border-none"

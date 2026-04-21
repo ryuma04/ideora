@@ -222,32 +222,32 @@ export default function MeetingDocumentViewer() {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
             {/* Top Navigation Header */}
-            <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-                <div className="flex items-center gap-6">
+            <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-5 flex flex-col sm:flex-row items-center justify-between sticky top-0 z-50 shadow-sm gap-4 sm:gap-0">
+                <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
                     <button
                         onClick={() => router.push('/dashboard/documents')}
-                        className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center"
+                        className="p-2 sm:p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center shrink-0"
                         title="Back to Vault"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </button>
-                    <div className="h-10 w-px bg-slate-200"></div>
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-indigo-200">Official Record</span>
-                            <h1 className="text-2xl font-black text-slate-900">{meetingInfo?.title || 'Meeting Report'}</h1>
+                    <div className="h-8 sm:h-10 w-px bg-slate-200"></div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-0.5">
+                            <span className="bg-indigo-100 text-indigo-700 text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-indigo-200 self-start shadow-sm">Official Record</span>
+                            <h1 className="text-base sm:text-2xl font-black text-slate-900 truncate leading-tight">{meetingInfo?.title || 'Meeting Report'}</h1>
                         </div>
-                        <p className="text-sm text-slate-500 font-medium">
-                            Interactive Visual Snapshot • {new Date(meetingInfo?.endedAt).toLocaleString()}
+                        <p className="text-[10px] sm:text-sm text-slate-500 font-medium truncate">
+                            Visual Snapshot • {new Date(meetingInfo?.endedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
                     <button
                         onClick={handleExportPDF}
                         disabled={exporting}
-                        className={`px-6 py-2.5 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 transform hover:-translate-y-0.5 ${
+                        className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5 text-xs sm:text-sm ${
                             exporting
                                 ? 'bg-indigo-400 text-white cursor-wait'
                                 : 'bg-slate-900 text-white hover:bg-indigo-600 hover:shadow-indigo-500/30'
@@ -259,21 +259,24 @@ export default function MeetingDocumentViewer() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Exporting...
+                                <span className="hidden sm:inline">Exporting...</span>
+                                <span className="sm:hidden">Exp...</span>
                             </>
                         ) : (
                             <>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Export to PDF
+                                <span className="hidden xs:inline">Export to PDF</span>
+                                <span className="xs:hidden">Export</span>
                             </>
                         )}
                     </button>
                 </div>
             </header>
 
-            <main className="flex-1 p-8 max-w-7xl mx-auto w-full flex flex-col">
-                {/* Internal Tool Tabs */}
-                <div className="flex items-center gap-2 mb-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex self-start">
+            <main className="flex-1 p-4 sm:p-8 max-w-7xl mx-auto w-full flex flex-col min-h-0 overflow-y-auto sm:overflow-visible">
+                {/* Internal Tool Tabs - Horizontal Scroll on Mobile */}
+                <div className="w-full overflow-hidden mb-2">
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto no-scrollbar scroll-smooth">
                     {['canvas', 'mindmap', 'stickyNotes', 'swot'].map((tab) => {
                         if (!docs[tab]) return null;
 
@@ -299,8 +302,9 @@ export default function MeetingDocumentViewer() {
                         )
                     })}
                 </div>
+            </div>
 
-                <div ref={contentRef} className="flex-1 flex flex-col h-[700px] relative mt-4">
+                <div ref={contentRef} className="flex-1 flex flex-col h-[500px] sm:h-[700px] relative mt-2 sm:mt-4">
                     {activeTab === 'canvas' && (
                         <div className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 z-10 w-full h-full">
                             <BrainstormingCanvas meetingId={meetingId || ""} readOnly={true} initialData={docs.canvas} />
