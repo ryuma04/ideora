@@ -140,7 +140,7 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
         return () => { socket.off('swot-update'); };
     }, [socket, performRemoteAction]);
 
-    // DB Persistence
+    // Redis Persistence
     useEffect(() => {
         const timeout = setTimeout(async () => {
             if (!isLoaded || readOnly || !meetingId) return;
@@ -150,13 +150,23 @@ export default function BrainstormingSwotAnalysis({ meetingId, readOnly = false,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, state: swotData })
                 });
+            } catch (err) {}
+        }, 2000);
+        return () => clearTimeout(timeout);
+    }, [swotData, meetingId, isLoaded, readOnly]);
+
+    // MongoDB Persistence
+    useEffect(() => {
+        const timeout = setTimeout(async () => {
+            if (!isLoaded || readOnly || !meetingId) return;
+            try {
                 await fetch('/api/brainstorming/swotAnalysis', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, action: 'save_to_db', state: swotData })
                 });
             } catch (err) {}
-        }, 5000);
+        }, 15000);
         return () => clearTimeout(timeout);
     }, [swotData, meetingId, isLoaded, readOnly]);
 

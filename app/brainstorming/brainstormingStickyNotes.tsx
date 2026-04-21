@@ -263,7 +263,7 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
             });
     }, [meetingId, handleNodeChange, setNodes, setEdges, readOnly, initialData]);
 
-    // DB Persistence logic
+    // Redis Persistence logic (Fast)
     useEffect(() => {
         const timeout = setTimeout(async () => {
             if (!isLoaded || readOnly) return;
@@ -277,13 +277,28 @@ function StickyNotesContent({ meetingId, readOnly = false, initialData }: Sticky
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, state: stateToSave })
                 });
+            } catch (err) {}
+        }, 2000);
+
+        return () => clearTimeout(timeout);
+    }, [nodes, edges, isLoaded, readOnly, meetingId]);
+
+    // MongoDB Persistence logic (Slow)
+    useEffect(() => {
+        const timeout = setTimeout(async () => {
+            if (!isLoaded || readOnly) return;
+            
+            const cleanNodes = nodes.map(n => ({...n, data: { ...n.data, onChange: undefined }}));
+            const stateToSave = { nodes: cleanNodes, edges };
+
+            try {
                 await fetch('/api/brainstorming/stickyNotes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ meetingId, action: 'save_to_db', state: stateToSave })
                 });
             } catch (err) {}
-        }, 5000);
+        }, 15000);
 
         return () => clearTimeout(timeout);
     }, [nodes, edges, isLoaded, readOnly, meetingId]);
